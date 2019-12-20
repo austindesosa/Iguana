@@ -10,6 +10,9 @@ INF=math.inf
 pi, e, deg, inf = PI, E, DEG, INF
 JIM = complex(0,1)
 
+MIN_HELM = 0.000001 * DEG # curves WITH LESS HELM THAN THIS
+# can be considered straight lines
+
 INCH=0.0254
 FOOT = 12 * INCH
 MILE = 5280 * FOOT
@@ -106,6 +109,7 @@ O_CLOCK = eul(30 * DEG)
 #for example, "1 o'clock" means 30 degrees rightward
 #O_CLOCK is that unit as a direction phasor
 
+
 ### VECTOR FUNCTIONS
 
 def funxvec(funx, v): #ver 
@@ -165,7 +169,7 @@ def riemvec(ti, tf, n):
 
 ### PHYSICS MATH FUNCTIONS
 
-#WARNING: Doesn't work for perfectly straight dlines
+#WARNING: Doesn't work for perfectly straight lines
 #only works for curved paths
 def curve_ray(theta, kurv_r):
   '''<Angle in radians> subtended by a curve, <Curvature Radius> of that curve
@@ -260,7 +264,7 @@ class Car:
     '''<Mass of car>, <Intentional power on car>, <Kinetic energy of car>'''
     self.name = "car" #default name for this Car object
     self.mass, self.pwr_drive, self.energy = mass, pwr_drive, energy
-    self.pos, self.delta_pos = 0*eul(0), 0*eul(0) #Position, changge in position, sored as a phasor
+    self.pos, self.delta_pos = 0*eul(0), 0*eul(0) #Position, change in position, stored as a phasor
     self.stop = 0 #boolean true if car is intentionally stopped
     self.brake = 0 #boolean true if driver is intentionally braking
     self.rev = 0 #boolean true if car is in reverse
@@ -273,9 +277,11 @@ class Car:
     self.delta_path = 0 + 0.0 #Distance travelled along path in a short time
     self.path = 0 + 0.0  #Total distance travelled since instantiation
     self.helm = 0 + 0.0 #Horizontal driving angle, in Radians per Meter rightward
-    #EXPERIMENTAL INSTANCE VARIABLES
-    self.is_curved = abs(self.helm) < (0.000001 * DEG) #Boolean true if car's path is curved
-    self.delta_tau = 0.1 #Short time delay for actual time delays like time.sleep()
+    self.is_curved = abs(self.helm) > MIN_HELM #Boolean true if car's path is curved
+    self.delta_tau = 0.0000000001 #Short time delay for actual time delays like time.sleep()
+    self.t_poll = 0.1 #Short time delay for predicting the car‘s motion
+    
+    
     
 
 
@@ -284,14 +290,14 @@ class Car:
     self.speed = (2.0 * self.energy / self.mass) ** (0.5)
     self.brake = self.pwr_drive < 0 #Set brake flag if driver intentionally reducing energy
     self.pwr_grav = GRAV * sin(self.tilt) * self.mass * self.speed
-    self.is_curved = abs(self.helm) < (0.000001 * DEG)
+    self.is_curved = abs(self.helm) > (0.000001 * DEG)
     if (self.speed <= 0) and (sgn(self.pwr_drive) < 0) :
       self.stop = 1
       self.energy = 0.0
     if (self.pwr_drive > 0 ):
       self.stop = 0
       self.brake = 0
-    #CODE NOTE: THe instance variables self.path and self.delta_path are NOT affected
+    #CODE NOTE: The instance variables self.path and self.delta_path are NOT affected
     #by the sweep() method, because sweep method does not handle the motion itself
     #and also because recalculating the displacement too often can lead to inaccurate results
 
@@ -307,11 +313,11 @@ class Car:
     self.sweep()
     energy_avg = avg([energy_initial, self.energy]) #average energy duting the short time, 
     #assuming constant mechanical power throughout
-    speed_avg = (2.0 * energy_avg / self.mass) ** 0.5 #average speed duting the time elapsed
+    speed_avg = (2.0 * energy_avg / self.mass) ** 0.5 #average speed during the time elapsed 
     self.delta_path = speed_avg * d_t
     #Mostly experimental/untested code the rest of the method
     curv_theta = self.helm * self.delta_path
-    curv_rad = xdiv(0, 1.0, self.helm) 
+    curv_rad = xdiv(0, 1.0, self.helm)
     if not self.is_curved:
       self.delta_pos = self.delta_path * eul(0)
     else:
@@ -328,7 +334,7 @@ class Car:
   def travel_raw(self, dur, delta_t):
     '''<Duration> in seconds, <Polling Period> in seconds
     Iterates the method Car.go(delta_t) until <dur> seconds have supposedly elapsed'''
-    n = dur // delta_t
+    n = int(dur // delta_t)
     for i in range(n):
       self.go(delta_t)
 
@@ -338,18 +344,30 @@ class Car:
     so other code can execute at the same time'''
     thr = threading.Thread(target = self.travel_raw, name = "", args = (dur, delta_t))
     thr.start()
+    
+  def to_speed_lin(self, speed_des, accel_time):
+    #@param   speed_des   is desired speed
+    #@param   accel_time   is time it should take to speed up/slow down
+    #Gets this Car object to desired speed
+    #by iterating Car.go( float ) at constant self.pwrdrive
+    energy_des = 0.5 * self.mass * (speed_des ** 2)
+    energy_delta = energy_des - self.energy
+    pwr_net_des = energy_delta / accel_time
+    self.pwr_drive = pwr_net_des - self.pwr_grav -self.pwr_other
+    
+    
 
   def str_motion(self):
     '''Returns string with attributes directly relevant to the motion'''
     strega = ""
-    strega+="self.speed = "+str(self.path)+"  meters per second\n"
-    strega+="self.pwr_drive = "+str(self.path)+"  watts\n"
-    strega+="self.pwr_net = "+(self.path)+"  watts\n"
-    strega+="self.energy = "+(self.path)+"  watt-seconds\n"
-    strega+="self.path = "+(self.path)+"  meters \n"
-    strega+="self.delta_path = "+(self.delta_path)+"  meters\n"
-    strega+="self.pos = "+(self.pos)+"  meters\n"
-    strega+="self.delta_pos = "+(self.delta_pos)+"  meters\n"
+    strega+="self.speed = "+str(self.speed)+"  meters per second\n"
+    strega+="self.pwr_drive = "+str(self.pwr_drive)+"  watts\n"
+    strega+="self.pwr_net = "+str(self.pwr_net)+"  watts\n"
+    strega+="self.energy = "+str(self.energy)+"  watt-seconds\n"
+    strega+="self.path = "+str(self.path)+"  meters \n"
+    strega+="self.delta_path = "+str(self.delta_path)+"  meters\n"
+    strega+="self.pos = "+str(self.pos)+"  meters\n"
+    strega+="self.delta_pos = "+str(self.delta_pos)+"  meters\n"
     strega+="\n\n\n"
     return strega
 
@@ -357,14 +375,13 @@ class Car:
     #UNTESTED
     '''<Duration> in seconds you want to run this method, <Polling Period> in seconds between print statements
     Prints attrributes related to the motion of the car every <d_tau> seconds, 
-    until ther have been <'''
-    n = dur // d_tau
+    until <dur> seconds have elapsed'''
+    n = int(dur // d_tau)
     for i in range(n):
-      print(self.str_motion)
-      self.sleep(d_tau)
+      print(self.str_motion())
+      time.sleep(d_tau)
 
   def tell_motion(self, dur, d_tau):
-    #UNTESTED
     '''<Duration> in seconds this method will run, <Polling Period>
     Prints attributes related to this Car's motion continually every <d_tau> seconds,
     but in a threaded manner'''
@@ -404,7 +421,7 @@ class Car:
   
   def tostring(self):
     strega = "Car   "+self.name+"   has these attributes:\n"
-    strega += "self.energy = "+str(self.energy)+"  watt-secondss\n"
+    strega += "self.energy = "+str(self.energy)+"  watt-seconds\n"
     strega += "self.pwr_drive = "+str(self.pwr_drive)+"  watts\n"
     strega += "self.pwr_grav = "+str(self.pwr_grav)+"  watts\n"
     strega += "self.pwr_other = "+str(self.pwr_other)+"  watts\n"
@@ -420,13 +437,66 @@ class Car:
     strega += "self.pos = "+str(self.pos)+" meters\n"
     strega += "self.speed = "+str(self.speed)+"  meters per second\n"
     strega += "self.delta_path = "+str(self.delta_path)+"  meters\n"
-    strega += "self.delta_pos = "+str(self.delta_path)+"  meters\n"
-    strega += "self.delta_tau = "+str(self.delta_path)+"  seconds\n"
+    strega += "self.delta_pos = "+str(self.delta_pos)+"  meters\n"
+    strega += "self.delta_tau = "+str(self.delta_tau)+"  seconds\n"
+    #strega += "self.t_poll = "+str(self.t_poll)+  "  seconds\n"
     strega += "END Car   "+self.name+"   attributes\n\n\n"
     return strega
 
 
+
+### LAND OBJECT 
+
+class Land:
+  
+  def __init__(self, tiltvec, helmvec, delta_space):
+    #self.name = ”land”
+    self.tiltvec, self.helmvec = tiltvec, helmvec
+    self.tilt_avg = avg(self.tiltvec) #average tilt
+    self.helm_avg = avg(self.helmvec) #average helm
+    #self.tiltvec holds the hill angles, self.helmvec holds the curvature of the road in the same units as Car.helm and Car.tilt
+    self.delta_space =  delta_space
+    self.size = min(len(self.tiltvec), len(self.helmvec)) # vec
+    self.frix_vec = podvec(0, self.size) #holds coefficients of friction
+    #in case I ever want to model that
+    self.compass = NORTH #orientation of the land AKA driver’s direction upon entering, as a unit phasor, assumed NORTH by default
+    self.carvec = [] #list of Car objects inteacting with this Land object
+    #assumed empty by default
+    self.phasorvec = []
+    for i in range(self.size):
+      ang = self.helmvec[i]*self.delta_space
+      if abs(ang) > MIN_HELM:
+        self.phasorvec.append(self.delta_space * eul(0))
+      else:
+        curv_r = 1.0 / abs(self.helmvec[i])
+        self.phasorvec.append(curve_ray(ang, curv_r))
+    self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
+        
+      
+    
+    
+
 ### TESTING SECTION
+ke = (55 * MPH) ** 2
+car_mass = 1500.7
+ke *= 0.5 * car_mass
+
+pwr = 0.1 * ke
+
+camry = Car(car_mass, pwr, ke)
+#print(camry.str_motion())
+
+tau = camry.delta_tau
+t_poll = camry.t_poll
+camry.travel(50*t_poll, t_poll)
+camry.tell_motion(50 * tau, 10*tau)
+
+
+
+
+  
+
+
 
 
 
