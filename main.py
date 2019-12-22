@@ -42,6 +42,16 @@ def sgn(x):
   else:
     return 1
 
+
+def prod(v):
+  '''<List> of Numbers
+  Multiplies together every element in <v>
+  and returns the result'''
+  p = 1
+  for i in range(len(v)):
+    p *= v[i]
+  return p
+
 def xmult(lhop, x1, x2):
   '''《lHospial limit》, 《scalar》, 《other scalar》
   lhop is winner of l'Hospital's
@@ -184,7 +194,7 @@ def riemvec(ti, tf, n):
     v.append(x)
   return v
 
-### PHYSICS MATH FUNCTIONS
+### MATH FUNCTIONS FOR THIS PROGRAM
 
 #WARNING:  curve_ray   doesn't work on perfectly straight lines.
 #It only works for curved paths.
@@ -216,7 +226,7 @@ def always_one(x):
 def velocity(speed, helm):
   '''<Speed>, <Helm> of moving object in SI units 
   Returns phasor representing the velocity,
-  as a phasor representing the arc subtendedin 1 second'''
+  as a phasor representing the arc subtended in 1 second'''
   if helm < MIN_HELM:
     return speed * eul(0)
   else:
@@ -358,6 +368,18 @@ def Linear(slope, y_i):
   fv = [Ramp(slope), Konstant(y_i)]
   return SumFunxion(fv, 0)
   
+def ProdFunxion(funxionvec, in_val):
+  '''<List of Funxion objects>, <Initial Input Value>
+  Returns a Funxion object whose output is the Product
+  of several Funxion outputs with the same input '''
+  def dummy(x):
+    yvec = []
+    for funxion in funxionvec:
+      funxion.feed( x )
+      yvec.append(funxion.out_val)
+    return prod(yvec)
+  fu = Funxion(dummy, 0)
+  return fu
 
 
 ### OBSTACLE CLASS
@@ -389,6 +411,20 @@ class Obstacle:
     Rotates orientation of this Obstacle by <ang> radians'''
     self.orientation *= eul(ang)
 
+  def copy(self):
+    '''Returns copy of this Obstacle objects'''
+    obst = Obstacle(self.funxion, self.position)
+    obst.name, obst.orientation = self.name, self.orientation
+    return obst
+
+  def rename(self, new_name):
+    self.name = new_name
+
+  def copy_name(self, new_name):
+    obst = self.copy() 
+    obst.rename(new_name)
+    return obst
+
   def tostring(self):
     strega = "Obstacle   "+self.name+"   has these instance variables:\n"
     strega += "self.funxion = "+str(self.funxion)+"\n"
@@ -405,7 +441,23 @@ def Circle(radius):
   with radius <radius> meters'''
   return Obstacle(Konstant(radius), 0 * eul(0))
 
+def Rectangle(shape_length, shape_width):
+  '''<Length of rectangle> in direction flush with self.orientation, <Width of rectangle> in direction normal to self.orientation
+  Returns Obstacle object representing a rectangle
+  of length <shape_length> meters, width <shape_width> meters'''
+  def dummy(theta):
+    th_corn = arctan(shape_width / shape_length)
+    th = theta % PI
+    if th_corn < th < (PI - th_corn):
+      return math.hypot( 0.5*shape_width, 0.5*shape_length*cos(th))
+    else:
+      return math.hypot(0.5*shape_length, 0.5*shape_width*sin(th))
+  fu = Funxion(dummy, 0)
+  obst = Obstacle(fu, 0*eul(0))
+  return obst
 
+
+      
 
 ### CAR CLASS
 
@@ -459,6 +511,7 @@ class Car:
     if not self.rev:
       self.rev = 1
       self.helm *= -1
+      self.tilt *= -1
       self.pwr_grav *= -1
     self.sweep() 
   
@@ -467,6 +520,7 @@ class Car:
     if self.rev:
       self.rev = 0
       self.helm *= -1
+      self.tilt *= -1
       self.pwr_grav *= -1
     self.sweep()  
 
@@ -690,7 +744,8 @@ class Land:
         curv_r = 1.0 / abs(self.helmvec[i])
         self.phasorvec.append(curve_ray(ang, curv_r))
     self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
-    self.tau_max = .00001
+    self.tau_max = .00001 #
+    self.t_land = .01 #Polling rate, in simulated seconds, for Car objects in this Land 
     
     
   def ndx_point(self, path):
@@ -725,6 +780,7 @@ class Land:
     self.carspacevec.append(space )
     for car in self.carvec:
       car.delta_tau = self.tau_max
+      car.t_poll = self.t_land
 
     
   def exit_car(self, car):
@@ -734,34 +790,35 @@ class Land:
       ndx = self.carvec.ndx( car  )
       
     
-  def ir_raw(self, car, delta_t, space):
-    '''<Car object>, <Amount of time> in seconds for car's motion, <Point where it is>  on the road in Car.path units
+  def ir_raw(self, car,  space):
+    '''<Car object>,  <Point where it is>  on the road in Car.path units
     Induces Car.go method in <car>,
-    simulating <delta_t> seconds of motion,
+    simulating self.t_land seconds of motion,
     starting <space> meters into the path, 
     then updates this Land object's instance variables'''
     if car not in self.carvec:
       self.enter_car(car, space)
     ndx_car = self.carvec.index(car)
-    car.go(delta_t)
+    car.go(self.t_land)
     if not car.rev:
       self.carspacevec[ndx_car] += car.delta_path
     else:
       self.carspacevec[ndx_car] -= car.delta_path
 
-  def ir(self, car, delta_t, space):
-    '''<Car object>, <Amount of Time> for car's motion, <Place> on the road, in car.path units 
-    Threaded version of   Land.ir_raw( Car, float, float )'''
-    thr = threading.Thread(target = self.ir_raw, name = "", args = (car, delta_t, space))
+  def ir(self, car,  space):
+    '''<Car object>,  <Place> on the road, in car.path units 
+    Threaded version of   Land.ir_raw( Car,  float )'''
+    thr = threading.Thread(target = self.ir_raw, name = "", args = (car,  space))
     thr.start()
 
-  def ir_todos(self, delta_t):
-    '''<Amount of Time> in seconds for cars' motion
-    Does the method self.ir( Car, float, float )
+  def ir_todos(self):
+    '''Does the method self.ir( Car, float )
     for every Car in this Land object,
     for the same amount of time'''
-    delta_t_vec = podvec(delta_t, len(self.carvec))
-    v = funxvec_3(self.ir, self.carvec, delta_t_vec, self.carspacevec)
+    #No params needed 
+    #because we take those from this Land object's instance variables.
+    #delta_t_vec = podvec(self.t_land, len(self.carvec))
+    v = funxvec_2(self.ir, self.carvec,  self.carspacevec)
     time.sleep(self.tau_max)
 
   
@@ -776,15 +833,37 @@ class Land:
     strega += "self.phasorvec = "+str(self.phasorvec)+"\n"
     strega += "self.compass = "+str(self.compass)+"\n"
     strega += "self.carvec = "+str(self.carvec)+"\n"
+    strega += "self.tau_max = "+str(self.tau_max)+"\n"
+    strega += "self.t_land = "+str(self.t_land)+"\n"
     strega += "END Land   "+self.name+"   instance variables\n\n\n"
     return strega
         
 
 ### TESTING SECTION
-camry = Car(1, 50, 10)
-for i in range(7):
-  camry.go_drive(0.1, Ramp(10))
-  print(camry.str_power())
+
+square = Rectangle(2,2)
+print(square.tostring())
+
+strega = "square.ray_length(0) = " + str( square.ray_length(0) )+"\n"
+strega += "square.ray_length( 30*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
+strega += "square.ray_length( 45*DEG ) = "+str( square.ray_length(45*DEG) )+"\n"
+strega += "square.ray_length( 70*DEG ) = "+str( square.ray_length(70*DEG) )+"\n"
+strega += "square.ray_length( 90*DEG ) = "+str( square.ray_length(90*DEG) )+"\n"
+strega += "square.ray_length( 110*DEG ) = "+str( square.ray_length(110*DEG) )+"\n"
+strega += "square.ray_length( 135*DEG ) = "+str( square.ray_length(135*DEG) )+"\n"
+strega += "square.ray_length( 156*DEG ) = "+str( square.ray_length(156*DEG) )+"\n"
+strega += "\nsquare.ray_length( 180*DEG ) = "+str( square.ray_length(180*DEG) )+"\n"
+strega += "square.ray_length( 207*DEG ) = "+str( square.ray_length(207*DEG) )+"\n"
+strega += "square.ray_length( 225*DEG ) = "+str( square.ray_length(225*DEG) )+"\n"
+strega += "square.ray_length( 241*DEG ) = "+str( square.ray_length(241*DEG) )+"\n"
+strega += "square.ray_length( 270*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
+strega += "square.ray_length( 294*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
+strega += "square.ray_length( 315*DEG ) = "+str( square.ray_length(315*DEG) )+"\n"
+strega += "square.ray_length( 343*DEG ) = "+str( square.ray_length(343*DEG) )+"\n"
+strega += "square.ray_length( -1*15*DEG ) = "+str( square.ray_length(-1*15*DEG) )+"\n"
+strega += "square.ray_length( 30*DEG ) = "+str( square.ray_length(-1*123*DEG) )+"\n\n\n"
+print(strega)
+
 
 
 
