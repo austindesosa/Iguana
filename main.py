@@ -13,7 +13,7 @@ JIM = complex(0,1)
 MIN_HELM = 0.000001 * DEG # curves WITH LESS HELM THAN THIS
 # can be considered straight lines
 
-INCH=0.0254
+INCH = 0.0254
 FOOT = 12 * INCH
 MILE = 5280 * FOOT
 
@@ -80,6 +80,12 @@ def eul(theta):
   with magnitude of one and phase angle <theta>'''
   return complex(cos(theta), sin(theta))
 
+
+def conj(p):
+  '''<Complex Number>
+  Returns its Complex Conjugate'''
+  return complex(p.real , -1 * p.imag)
+
 def angle(x):
   '''<Complex number>
   Returns the phase angle, in radians'''
@@ -103,11 +109,22 @@ SOUTH = eul(PI)
 WEST = eul(-1 * PI / 2)
 
 # RELATIVE DIRECTIONS
+#These can be converted to absolute directions
+#if you multiply them by an absolute direction phasor
+#to "rotate" them.
+#For example,   NORTH * eul(30*DEG)  
+#means 30 degrees east of north.
 
 O_CLOCK = eul(30 * DEG)
 #People sometimes say "o'clock" as a unit of helm
 #for example, "1 o'clock" means 30 degrees rightward
 #O_CLOCK is that unit as a direction phasor
+#To find the direction phasor for 2 o'clock,
+#you  would go  
+#O_CLOCK ** 2
+
+ONE_DEGREE = eul( DEG ) #one degree rightwards as a direction phasor
+ONE_RADIAN = eul(1) #one radian, as a direction phasor
 
 
 ### VECTOR FUNCTIONS
@@ -169,17 +186,43 @@ def riemvec(ti, tf, n):
 
 ### PHYSICS MATH FUNCTIONS
 
-#WARNING: Doesn't work for perfectly straight lines
-#only works for curved paths
+#WARNING:  curve_ray   doesn't work on perfectly straight lines.
+#It only works for curved paths.
 def curve_ray(theta, kurv_r):
   '''<Angle in radians> subtended by a curve, <Curvature Radius> of that curve
   Returns phasor (complex number) 
   whose Magnitude is the distance from startpoint to endpoint of the curve as the crow flies,
-  and whose Angle is the angle of that ray wrt driver's direction 
-  at beginning of driving along that curve'''
+  and whose Angle is the angle of that ray WRT driver's direction at startpoint
+  '''
   mag_ang = 0.5 * (PI - theta)
   mag = 2 * kurv_r * cos(mag_ang)
   return mag * eul(theta / 2)
+
+def unity(x):
+  '''<Number>
+  Returns number equal to <x>'''
+  return 1*x
+
+def always_zero(x):
+  '''<Number>
+  Returns 0 no matter the input'''
+  return 0
+
+def always_one(x):
+  '''<Number>
+  Returns 1 no matter what'''
+  return 1
+
+def velocity(speed, helm):
+  '''<Speed>, <Helm> of moving object in SI units 
+  Returns phasor representing the velocity,
+  as a phasor representing the arc subtendedin 1 second'''
+  if helm < MIN_HELM:
+    return speed * eul(0)
+  else:
+    return curve_ray(speed, speed * helm)
+
+
 
 ### FUNXION CLASS
 
@@ -233,6 +276,12 @@ class Funxion:
     #print("\nddx = "+str(ddx)+"\n\n")
     return ddx
 
+  def refunx(self, funx_new):
+    '''<Python function> to replace self.funx
+    Changes self.funx and readjusts this Funxion object accordingly'''
+    self.funx = funx_new
+    self.sweep()
+
   def rename(self, new_name):
     '''<String> representing new name 
     Renames this Funxion object'''
@@ -249,6 +298,16 @@ class Funxion:
     fu = self.copy() 
     fu.rename(new_name)
 
+  def scale(self, k):
+    '''<Scaling factor>
+    Returns Funxion object just like this one,
+    except the encapsulated function is scaled by <k>'''
+    def dummy(x):
+      return k * self.funx(x)
+    fu = Funxion(dummy, self.in_val)
+    return fu
+
+
 
 
   def tostring(self):
@@ -257,6 +316,98 @@ class Funxion:
     strega+="\nEND Funxion   "+self.name+"   instance variables\n\n"
     return strega
 
+### FUNCTIONS THAT RETURN FUNXION OBJECTS 
+
+def Konstant(k):
+  '''<Constant>
+  Returns a Funxion object
+  whose output is always <k>
+  '''
+  def dummy(x):
+    return k 
+  fu = Funxion(dummy, 0)
+  return fu
+
+def Ramp(k):
+  '''<Constant>
+  Returns Funxion object
+  representing the math function 
+  y(x) = <k> * x'''
+  def dummy(x):
+    return k * unity( x )   
+  fu = Funxion(dummy, 0)
+  return fu
+
+def SumFunxion(funxionvec, in_val):
+  '''<List of Funxion objects>, <Initial Input Value>
+  Returns a Funxion object whose output is the sum
+  of several Funxion outpuots with the same input '''
+  def dummy(x):
+    yvec = []
+    for funxion in funxionvec:
+      funxion.feed( x )
+      yvec.append(funxion.out_val)
+    return sum(yvec)
+  fu = Funxion(dummy, 0)
+  return fu
+
+def Linear(slope, y_i):
+  '''<slope>, <y-intercept>
+  Returns Funxion object encapsulating linear function
+  y = <y_i> + (<slope> * x)'''
+  fv = [Ramp(slope), Konstant(y_i)]
+  return SumFunxion(fv, 0)
+  
+
+
+### OBSTACLE CLASS
+
+class Obstacle:
+  
+  def __init__(self, funxion, position):
+    '''<Funxion object> representing spatial borders of obstacle, <phasor> representing initial position of obstacle
+    Returns object representing
+    the space occupied by an obstacle or vehicle'''
+    self.name = "obstacle"
+    self.funxion = funxion
+    self.position = position
+    self.orientation = NORTH 
+    
+  def ray_length(self, theta):
+    '''<Angle> in radians
+    Returns distance from centerpoint to border at that angle'''
+    th = theta % (2 * PI)
+    return self.funxion.funx(th)
+
+  def move(self, delta_position):
+    '''<Phasor> representing change in position
+    Changes the absolute position of this object'''
+    self.position += delta_position
+
+  def turn(self, ang):
+    '''<Angle> in radians rightward
+    Rotates orientation of this Obstacle by <ang> radians'''
+    self.orientation *= eul(ang)
+
+  def tostring(self):
+    strega = "Obstacle   "+self.name+"   has these instance variables:\n"
+    strega += "self.funxion = "+str(self.funxion)+"\n"
+    strega += "self.position = "+str(self.position)+"\n"
+    strega += "self.orientation = "+str(self.orientation)+"\n"
+    strega += "END Obstacle   "+self.name+"   instance variables\n\n\n"
+    return strega
+    
+
+### FUNCTIONS THAT RETURN OBSTACLE OBJECTS
+def Circle(radius):
+  '''<Radius> in meters open
+  Returns Obstacle object representing a circle shape
+  with radius <radius> meters'''
+  return Obstacle(Konstant(radius), 0 * eul(0))
+
+
+
+### CAR CLASS
 
 class Car:
 
@@ -280,6 +431,7 @@ class Car:
     self.is_curved = abs(self.helm) > MIN_HELM #Boolean true if car's path is curved
     self.delta_tau = 0.0000000001 #Short time delay for actual time delays like time.sleep()
     self.t_poll = 0.1 #Short time delay for predicting the car‘s motion
+    self.t_now = 0.0 #Amount of time car has been in motion
     
     
     
@@ -290,6 +442,7 @@ class Car:
     self.speed = (2.0 * self.energy / self.mass) ** (0.5)
     self.brake = self.pwr_drive < 0 #Set brake flag if driver intentionally reducing energy
     self.pwr_grav = GRAV * sin(self.tilt) * self.mass * self.speed
+    self.pwr_net = self.pwr_grav + self.pwr_drive + self.pwr_other
     self.is_curved = abs(self.helm) > (0.000001 * DEG)
     if (self.speed <= 0) and (sgn(self.pwr_drive) < 0) :
       self.stop = 1
@@ -301,21 +454,42 @@ class Car:
     #by the sweep() method, because sweep method does not handle the motion itself
     #and also because recalculating the displacement too often can lead to inaccurate results
 
+  def reverse(self):
+    '''Puts this Car in reverse'''
+    if not self.rev:
+      self.rev = 1
+      self.helm *= -1
+      self.pwr_grav *= -1
+    self.sweep() 
+  
+  def forward(self):
+    '''Takes this Car out of reverse'''
+    if self.rev:
+      self.rev = 0
+      self.helm *= -1
+      self.pwr_grav *= -1
+    self.sweep()  
+
+  
+
   def go(self, delta_t):
     '''<Short amount of time> in secondss
     Changes the instance variables to model a small amount of motion in the car'''
     energy_initial = 0.0 + self.energy
     d_t = 0.0 + delta_t
+    self.sweep()
     if (self.pwr_net < 0) and ( abs(self.pwr_net * delta_t) > energy_initial):
       d_t = energy_initial / self.pwr_net #amount of time it will take car to stop at this rate
-    time.sleep(self.delta_tau) #experimental code, delay for threading purposes
+    time.sleep(self.delta_tau) #delay for threading purposes
     self.energy += self.pwr_net * d_t
+    #EXPERIMENTAL CODE 
+    self.t_now += d_t
+    #END EXPERIMENTAL CODE
     self.sweep()
     energy_avg = avg([energy_initial, self.energy]) #average energy duting the short time, 
     #assuming constant mechanical power throughout
     speed_avg = (2.0 * energy_avg / self.mass) ** 0.5 #average speed during the time elapsed 
     self.delta_path = speed_avg * d_t
-    #Mostly experimental/untested code the rest of the method
     curv_theta = self.helm * self.delta_path
     curv_rad = xdiv(0, 1.0, self.helm)
     if not self.is_curved:
@@ -328,7 +502,15 @@ class Car:
     else:
       self.path -= self.delta_path
       self.pos -= self.delta_pos
-    #the rest of the code in this method is for testing purposes only
+    
+
+  def go_drive(self, delta_t, drivefunxion):
+    '''<Amount of time> in seconds for motion, <Funxion objet> representing self.pwr_drive as a  function of time
+    Uses self.go( <delta_t> ) but decides self.pwr_driveby the function encapsulated in <drivefunxion>'''
+    drivefunxion.feed(self.t_now)
+    self.pwr_drive = drivefunxion.out_val
+    self.sweep() 
+    self.go(delta_t)
 
     
   def travel_raw(self, dur, delta_t):
@@ -346,15 +528,17 @@ class Car:
     thr.start()
     
   def to_speed_lin(self, speed_des, accel_time):
-    #@param   speed_des   is desired speed
+    '''#@param   speed_des   is desired speed
     #@param   accel_time   is time it should take to speed up/slow down
     #Gets this Car object to desired speed
     #by iterating Car.go( float ) at constant self.pwrdrive
+    '''
     energy_des = 0.5 * self.mass * (speed_des ** 2)
     energy_delta = energy_des - self.energy
     pwr_net_des = energy_delta / accel_time
-    self.pwr_drive = pwr_net_des - self.pwr_grav -self.pwr_other
-    
+    self.pwr_drive = pwr_net_des - self.pwr_grav - self.pwr_other
+    self.sweep()
+    self.travel(accel_time, self.t_poll)
     
 
   def str_motion(self):
@@ -368,8 +552,38 @@ class Car:
     strega+="self.delta_path = "+str(self.delta_path)+"  meters\n"
     strega+="self.pos = "+str(self.pos)+"  meters\n"
     strega+="self.delta_pos = "+str(self.delta_pos)+"  meters\n"
+    strega += "self.t_now = "+str(self.t_now)+"  seconds\n"
     strega+="\n\n\n"
     return strega
+
+  def str_power(self):
+    '''Returns string containig all the 
+    power-related attributes of this Car object'''
+    strega = "self.pwr_net = "+str(self.pwr_net)+"  watts\n"
+    strega += "self.pwr_drive = "+str(self.pwr_drive)+"  watts\n"
+    strega += "self.pwr_other = "+str(self.pwr_other)+"  watts\n"
+    strega += "self.pwr_grav = "+str(self.pwr_grav) +"  watts\n"
+    strega += "self.tilt = "+str(self.tilt)+"  radians downward\n"
+    strega += "self.energy = "+str(self.energy)+" watt-seconds\n\n\n"
+    return strega 
+
+  def str_time(self):
+    '''Returns string containing all time-related attributes
+    of this Car object'''
+    strega = "self.delta_tau = "+str(self.delta_tau)+"  seconds of processor time\n"
+    strega += "self.t_poll = "+str(self.t_poll)+"  seconds of simulated time\n"
+    strega += "self.t_now = "+str(self.t_now)+"  seconds of simulated time\n\n\n"
+    return strega
+
+  def str_flags(self):
+    '''Returns string cpontaining all boolean attributes
+    of this Car object'''
+    strega = "self.brake = "+str(int(self.brake))+"  boolean\n"
+    strega += "self.stop = "+str(int(self.stop)) +"  boolean\n"
+    strega += "self.rev = "+str(int(self.rev)) +"  boolean\n"
+    strega += "self.is_curved = "+str(int(self.is_curved))+"  boolean\n\n\n"
+    return strega
+
 
   def tell_motion_raw(self, dur, d_tau):
     #UNTESTED
@@ -403,6 +617,9 @@ class Car:
     car.tilt, car.helm = self.tilt, self.helm
     car.pwr_grav, car.pwr_other, car.pwr_net = self.pwr_grav, self.pwr_other, self.pwr_net
     car.speed, car.path, car.delta_path = self.speed, self.path, self.delta_path
+    car.pos, car.delta_pos = self.pos, self.delta_pos
+    car.is_curved, car.delta_tau = self.is_curved, self.delta_tau
+    car.t_poll, car.t_now = self.t_poll, self.t_now
     return car
 
   def copy_name(self, new_name):
@@ -439,7 +656,8 @@ class Car:
     strega += "self.delta_path = "+str(self.delta_path)+"  meters\n"
     strega += "self.delta_pos = "+str(self.delta_pos)+"  meters\n"
     strega += "self.delta_tau = "+str(self.delta_tau)+"  seconds\n"
-    #strega += "self.t_poll = "+str(self.t_poll)+  "  seconds\n"
+    strega += "self.t_poll = "+str(self.t_poll)+  "  seconds\n"
+    strega += "self.t_now = "+str(self.t_now)+"  seconds\n"
     strega += "END Car   "+self.name+"   attributes\n\n\n"
     return strega
 
@@ -463,6 +681,7 @@ class Land:
     self.carvec = [] #list of Car objects inteacting with this Land object
     #assumed empty by default
     self.phasorvec = []
+    self.carspacevec = []
     for i in range(self.size):
       ang = self.helmvec[i]*self.delta_space
       if abs(ang) > MIN_HELM:
@@ -471,33 +690,101 @@ class Land:
         curv_r = 1.0 / abs(self.helmvec[i])
         self.phasorvec.append(curve_ray(ang, curv_r))
     self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
-        
+    self.tau_max = .00001
+    
+    
+  def ndx_point(self, path):
+    '''<Distance travelled> along path represented by this Land object, in same units as Car.path
+    Returns index of self.tiltvec and self.helmvec corresponding to that point along the path
+    '''
+    n = int(path // self.delta_space)
+    n = min(n, self.size)
+    return n 
+
+  def point_ray(self, space):
+    '''<Distance travelled> along path represnted by theis Land object
+    Returns phasor representing net displacement between beginning of path
+    and that point in space''' 
+    ndx = self.ndx_point(space)
+    ray = 0 * eul(0)
+    for i in range(ndx):
+      ray += self.phasorvec[i]
+    last_space = space - (ndx * self.delta_space)
+    h = self.helmvec[ndx]
+    if (h < MIN_HELM):
+      ray += last_space * eul(0)
+    else:
+      ray += curve_ray(last_space, last_space * h)
+    return ray 
+
+    
+  def enter_car(self, car, space):
+    '''<Car object>, <Place on path> in Car.path units
+    Puts a Car object to interact with this Land object'''
+    self.carvec.append(car)
+    self.carspacevec.append(space )
+    for car in self.carvec:
+      car.delta_tau = self.tau_max
+
+    
+  def exit_car(self, car):
+    '''<Car object>
+    Removes that Car from this Land object if it's in here'''
+    if car in self.carvec:
+      ndx = self.carvec.ndx( car  )
       
     
-    
+  def ir_raw(self, car, delta_t, space):
+    '''<Car object>, <Amount of time> in seconds for car's motion, <Point where it is>  on the road in Car.path units
+    Induces Car.go method in <car>,
+    simulating <delta_t> seconds of motion,
+    starting <space> meters into the path, 
+    then updates this Land object's instance variables'''
+    if car not in self.carvec:
+      self.enter_car(car, space)
+    ndx_car = self.carvec.index(car)
+    car.go(delta_t)
+    if not car.rev:
+      self.carspacevec[ndx_car] += car.delta_path
+    else:
+      self.carspacevec[ndx_car] -= car.delta_path
 
-### TESTING SECTION
-ke = (55 * MPH) ** 2
-car_mass = 1500.7
-ke *= 0.5 * car_mass
+  def ir(self, car, delta_t, space):
+    '''<Car object>, <Amount of Time> for car's motion, <Place> on the road, in car.path units 
+    Threaded version of   Land.ir_raw( Car, float, float )'''
+    thr = threading.Thread(target = self.ir_raw, name = "", args = (car, delta_t, space))
+    thr.start()
 
-pwr = 0.1 * ke
-
-camry = Car(car_mass, pwr, ke)
-#print(camry.str_motion())
-
-tau = camry.delta_tau
-t_poll = camry.t_poll
-camry.travel(50*t_poll, t_poll)
-camry.tell_motion(50 * tau, 10*tau)
-
-
-
+  def ir_todos(self, delta_t):
+    '''<Amount of Time> in seconds for cars' motion
+    Does the method self.ir( Car, float, float )
+    for every Car in this Land object,
+    for the same amount of time'''
+    delta_t_vec = podvec(delta_t, len(self.carvec))
+    v = funxvec_3(self.ir, self.carvec, delta_t_vec, self.carspacevec)
+    time.sleep(self.tau_max)
 
   
+  def tostring(self):
+    strega = "Land   "+self.name+"   has these instance variables \n"
+    strega += "self.delta_space = "+str(self.delta_space)+"\n"
+    strega += "self.tilt_avg = "+str(self.tilt_avg)+"\n"
+    strega += "self.tiltvec = "+str(self.tiltvec)+"\n"
+    strega += "self.helm_avg = "+str(self.helm_avg)+"\n"
+    strega += "self.helmvec = "+str(self.helmvec)+"\n"
+    strega += "self.ray = "+str(self.ray)+"\n"
+    strega += "self.phasorvec = "+str(self.phasorvec)+"\n"
+    strega += "self.compass = "+str(self.compass)+"\n"
+    strega += "self.carvec = "+str(self.carvec)+"\n"
+    strega += "END Land   "+self.name+"   instance variables\n\n\n"
+    return strega
+        
 
-
-
+### TESTING SECTION
+camry = Car(1, 50, 10)
+for i in range(7):
+  camry.go_drive(0.1, Ramp(10))
+  print(camry.str_power())
 
 
 
