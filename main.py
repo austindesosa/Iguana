@@ -606,6 +606,7 @@ class Car:
     strega+="self.delta_path = "+str(self.delta_path)+"  meters\n"
     strega+="self.pos = "+str(self.pos)+"  meters\n"
     strega+="self.delta_pos = "+str(self.delta_pos)+"  meters\n"
+    strega += "self.helm = "+str(self.helm)+"  radians per meter\n"
     strega += "self.t_now = "+str(self.t_now)+"  seconds\n"
     strega+="\n\n\n"
     return strega
@@ -702,7 +703,7 @@ class Car:
     strega += "self.stop = "+str(self.stop)+"  boolean\n"
     strega += "self.brake = "+str(self.brake)+"  boolean\n"
     strega += "self.rev = "+str(self.rev)+"  boolean\n"
-    strega += "self.is_curved"+str(self.is_curved)+"  boolean\n"
+    strega += "self.is_curved = "+str(self.is_curved)+"  boolean\n"
     strega += "self.helm = "+str(self.helm)+"  radians per meter rightward\n"
     strega += "self.path = "+str(self.path)+"  meters\n"
     strega += "self.pos = "+str(self.pos)+" meters\n"
@@ -722,7 +723,7 @@ class Car:
 class Land:
   
   def __init__(self, tiltvec, helmvec, delta_space):
-    #self.name = ”land”
+    self.name = "land"
     self.tiltvec, self.helmvec = tiltvec, helmvec
     self.tilt_avg = avg(self.tiltvec) #average tilt
     self.helm_avg = avg(self.helmvec) #average helm
@@ -799,6 +800,11 @@ class Land:
     if car not in self.carvec:
       self.enter_car(car, space)
     ndx_car = self.carvec.index(car)
+    ndx_space = self.ndx_point(space)
+    land_tilt, land_helm = self.tiltvec[ndx_space], self.helmvec[ndx_space]
+    car.tilt = land_tilt
+    car.helm = land_helm
+    car.sweep()
     car.go(self.t_land)
     if not car.rev:
       self.carspacevec[ndx_car] += car.delta_path
@@ -841,28 +847,23 @@ class Land:
 
 ### TESTING SECTION
 
-square = Rectangle(2,2)
-print(square.tostring())
+camry = Car(1000, 2.5e5, 500*(25*MPH)**2)
+camry.rename("camry")
+tv = podvec(0, 10)
+hv = podvec(1*DEG, 10)
+ds = 0.9
+lago = Land(tv, hv, ds)
+lago.t_land = 0.1
+lago.enter_car(camry, 0)
+print(lago.tostring() + camry.tostring())
+print("\nBEGINNING SIMULATION\n\n")
+for i in range(5):
+  lago.ir_todos() 
+  print(camry.str_motion())
+print("\nEND SIMULATION\n\n")
 
-strega = "square.ray_length(0) = " + str( square.ray_length(0) )+"\n"
-strega += "square.ray_length( 30*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
-strega += "square.ray_length( 45*DEG ) = "+str( square.ray_length(45*DEG) )+"\n"
-strega += "square.ray_length( 70*DEG ) = "+str( square.ray_length(70*DEG) )+"\n"
-strega += "square.ray_length( 90*DEG ) = "+str( square.ray_length(90*DEG) )+"\n"
-strega += "square.ray_length( 110*DEG ) = "+str( square.ray_length(110*DEG) )+"\n"
-strega += "square.ray_length( 135*DEG ) = "+str( square.ray_length(135*DEG) )+"\n"
-strega += "square.ray_length( 156*DEG ) = "+str( square.ray_length(156*DEG) )+"\n"
-strega += "\nsquare.ray_length( 180*DEG ) = "+str( square.ray_length(180*DEG) )+"\n"
-strega += "square.ray_length( 207*DEG ) = "+str( square.ray_length(207*DEG) )+"\n"
-strega += "square.ray_length( 225*DEG ) = "+str( square.ray_length(225*DEG) )+"\n"
-strega += "square.ray_length( 241*DEG ) = "+str( square.ray_length(241*DEG) )+"\n"
-strega += "square.ray_length( 270*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
-strega += "square.ray_length( 294*DEG ) = "+str( square.ray_length(30*DEG) )+"\n"
-strega += "square.ray_length( 315*DEG ) = "+str( square.ray_length(315*DEG) )+"\n"
-strega += "square.ray_length( 343*DEG ) = "+str( square.ray_length(343*DEG) )+"\n"
-strega += "square.ray_length( -1*15*DEG ) = "+str( square.ray_length(-1*15*DEG) )+"\n"
-strega += "square.ray_length( 30*DEG ) = "+str( square.ray_length(-1*123*DEG) )+"\n\n\n"
-print(strega)
+
+
 
 
 
