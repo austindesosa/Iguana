@@ -759,7 +759,7 @@ class Land:
     self.carspacevec = []
     for i in range(self.size):
       ang = self.helmvec[i]*self.delta_space
-      if abs(ang) > MIN_HELM:
+      if abs(ang) < MIN_HELM:
         self.phasorvec.append(self.delta_space * eul(0))
       else:
         curv_r = 1.0 / abs(self.helmvec[i])
@@ -911,26 +911,39 @@ class Land:
     strega += "self.t_land = "+str(self.t_land)+"\n"
     strega += "END Land   "+self.name+"   instance variables\n\n\n"
     return strega
+    
+### FUNCTIONS THAT RETURN LAND OBJECTS   
+def Flatland(distance, prec):
+  #@param   distance   is path length in Car.path units
+  #@param   prec   is Land.delta_space for this Land object
+  #Returns Land object representing perfectly flat, straight,
+  #and frictionless road
+  n = 1 + int(distance // prec)
+  v, u = podvec(0, n), podvec(0,n)
+  kans = Land(v, u, prec)
+  kans.sweep()
+  return kans
         
 
 ### TESTING SECTION
 
 #Instantiate Car object
-camry=Car(100, 0, 0)
+camry=Car(1000, 3000, 55000)
 
 camry.t_poll=0.2
 camry.sweep()
 
 #Declare Funxion objects
-manejar = Linear(500, 78)
-otro = Konstant(-1 * 77)
+manejar = Linear(777, 3000)
+otro = Ramp(-1/8000)
 
-print(camry.str_power)
-for i in range(7):
-  camry.go_other(manejar, otro)
-  print( camry.str_power())
+texas = Flatland( MILE, 200)
+texas.enter_car(camry, 0)
+print(texas.tostring())
 
-
+for i in range(10):
+  texas.ir_other(manejar, otro, 0)
+  print(camry.str_power())
 
 
 
