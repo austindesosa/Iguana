@@ -538,11 +538,11 @@ class Car:
       d_t = energy_initial / self.pwr_net #amount of time it will take car to stop at this rate
     time.sleep(self.delta_tau) #delay for threading purposes
     self.energy += self.pwr_net * d_t
-    #EXPERIMENTAL CODE 
+    #
     self.t_now += d_t
-    #END EXPERIMENTAL CODE
+    #
     self.sweep()
-    energy_avg = avg([energy_initial, self.energy]) #average energy duting the short time, 
+    energy_avg = avg([energy_initial, self.energy]) #average energy during the short time, 
     #assuming constant mechanical power throughout
     speed_avg = (2.0 * energy_avg / self.mass) ** 0.5 #average speed during the time elapsed 
     self.delta_path = speed_avg * d_t
@@ -555,9 +555,17 @@ class Car:
     if not self.rev:
       self.path += self.delta_path
       self.pos += self.delta_pos
+      #EXPERIMENTAL CODE
+      self.shape.move(self.delta_pos)
+      self.shape.turn(2 * angle(self.delta_pos))
+      #END EXPERIMENTAL CODE
     else:
       self.path -= self.delta_path
       self.pos -= self.delta_pos
+      #EXPERIMENTAL CODE
+      self.shape.move(self.delta_pos)
+      self.shape.turn(2 * angle(self.delta_pos))
+      #END EXPERIMENTAL CODE
     
 
   def go_drive(self, delta_t, drivefunxion):
@@ -568,7 +576,7 @@ class Car:
     self.sweep() 
     self.go(delta_t)
     
-  def go_other(self, drivefunxion, otherfunxion):
+  def go_other(self, drivefunxion, otherfunxion): 
     #@param   drivefunxion   is Funxion object
     #representing self.pwr_drive as a function of Time
     #@param   otherfunxion   is Funxion object
@@ -579,21 +587,21 @@ class Car:
     self.go_drive(self.t_poll, drivefunxion)
 
     
-  def travel_raw(self, dur, delta_t):
+  def travel_raw(self, dur, delta_t): #NOT RECOMMENDED
     '''<Duration> in seconds, <Polling Period> in seconds
     Iterates the method Car.go(delta_t) until <dur> seconds have supposedly elapsed'''
     n = int(dur // delta_t)
     for i in range(n):
       self.go(delta_t)
 
-  def travel(self, dur, delta_t):
+  def travel(self, dur, delta_t): #NOT RECOMMENDED
     '''<Duration> in seconds, <Polling Period> in seconds
     Iterates the method Car.go(float), but in a threaded manner,
     so other code can execute at the same time'''
     thr = threading.Thread(target = self.travel_raw, name = "", args = (dur, delta_t))
     thr.start()
     
-  def to_speed_lin(self, speed_des, accel_time):
+  def to_speed_lin(self, speed_des, accel_time): #NOT RECOMMENDED
     '''#@param   speed_des   is desired speed
     #@param   accel_time   is time it should take to speed up/slow down
     #Gets this Car object to desired speed
@@ -865,7 +873,14 @@ class Land:
     time.sleep(self.tau_max)
 
   def ir_other_raw(self, drivefunxion, otherfunxion, ndx_car):
-    print("Land.ir_other_raw invoked\n")
+    #@param   drivefunxion   is Funxion object 
+    #   representing Car.pwr_drive vs. time
+    #@param   otherfunxion   is Funxion object 
+    #   representing Car.pwr_other vs. kinetic energy
+    #@param   ndx_car   is an int representing 
+    #   the index of self.carvec
+    #Induces the method Car.go_other( Funxion, Funxion )
+    #in a Car object which is already in this Land object
     car = self.carvec[ndx_car]
     self.sweep() 
     car.go_other(drivefunxion, otherfunxion)
@@ -901,23 +916,19 @@ class Land:
 ### TESTING SECTION
 
 #Instantiate Car object
-camry_mass = 1000.0
-camry_energy = (camry_mass / 2)*((30*MPH)**2)
-camry_pwr = camry_energy * 0.15
-camry = Car(camry_mass, camry_pwr, camry_energy)
+camry=Car(100, 0, 0)
 
 camry.t_poll=0.2
 camry.sweep()
 
 #Declare Funxion objects
-manejar = Linear(0.3*camry_pwr, camry_pwr)
-otro = Ramp(-1 * camry_mass / 10)
+manejar = Linear(500, 78)
+otro = Konstant(-1 * 77)
 
 print(camry.str_power)
 for i in range(7):
   camry.go_other(manejar, otro)
-  print(camry.str_power()) 
-  
+  print( camry.str_power())
 
 
 
