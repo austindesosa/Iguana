@@ -13,6 +13,8 @@ JIM = complex(0,1)
 MIN_HELM = 0.000001 * DEG # curves WITH LESS HELM THAN THIS
 # can be considered straight lines
 
+LAND_PREC = 0.1 # Recommended value for Land.delta_space
+
 INCH = 0.0254
 FOOT = 12 * INCH
 MILE = 5280 * FOOT
@@ -207,6 +209,18 @@ def curve_ray(theta, kurv_r):
   mag_ang = 0.5 * (PI - theta)
   mag = 2 * kurv_r * cos(mag_ang)
   return mag * eul(theta / 2)
+
+
+def to_ray(d_path, helm):
+  #@param   d_path   is distance travelled on a path 
+  #@param   helm   is the helm of a car travelling that path
+  #Returns phasor representing net displacement of that path,
+  #be it straight or curved
+  ang = d_path * helm
+  if ang < MIN_HELM:
+    return d_path * eul(0)
+  else:
+    return curve_ray( ang , 1.0/helm)
 
 def unity(x):
   '''<Number>
@@ -765,7 +779,7 @@ class Land:
         curv_r = 1.0 / abs(self.helmvec[i])
         self.phasorvec.append(curve_ray(ang, curv_r))
     self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
-    self.tau_max = .00001 #
+    self.tau_max = .00001 #Processor time constant
     self.t_land = .01 #Polling rate, in simulated seconds, for Car objects in this Land 
     
     
@@ -819,6 +833,20 @@ class Land:
     else:
       ray += curve_ray(last_space, last_space * h)
     return ray 
+    
+  def extend(self, tilt_v, helm_v ):
+    #Adds more points to this Land object
+    #@param   tilt_v   is list of values
+    #   to be added to self.tiltvec
+    #@param   helm_v   is list of values 
+    #   to be added to self.helmvec
+    n = min(len(tilt_v), len(helm_v))
+    for i in range(n):
+      self.tiltvec.append(tilt_v[i])
+      self.helmvec.append(helm_v[i])
+      self.frixvec.append(self.frixvec[-1])
+      self.phasorvec.append(to_ray(self.delta_space, helm_v[i]))
+    self.sweep()
 
     
   def enter_car(self, car, space):
@@ -937,11 +965,19 @@ camry.sweep()
 manejar = Linear(777, 3000)
 otro = Ramp(-1/8000)
 
-texas = Flatland( MILE, 200)
+texas = Flatland( 0.125*MILE, 100)
+texas.extend([.01, .03], [.2, .4])
 texas.enter_car(camry, 0)
-print(texas.tostring())
 
-for i in range(10):
+#print(texas.tostring())
+
+rollo = to_ray(5, 0)
+cobra = to_ray(7, 7*DEG)
+
+print(str(rollo))
+print(str(cobra))
+
+for i in range(0):
   texas.ir_other(manejar, otro, 0)
   print(camry.str_power())
 
