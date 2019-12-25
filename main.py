@@ -921,6 +921,19 @@ class Land:
     thr = threading.Thread(target = self.ir_other_raw, name="", args = (drivefunxion, otherfunxion, ndx_car))
     thr.start()
     
+  def ir_otros(self, drivevec, othervec):
+    #@param   drivevec   is a List of Funxion objects 
+    #   to be used to calculate Car.pwr_drive  
+    #@param   othervec   ... calculate Car.pwr_other
+    #Lists correspond to self.carvec
+    #Does method self.ir_other,
+    #but on every Car in this Land object  
+    for i in range(len(self.carvec)):
+      drive, other = drivevec[i], othervec[i]
+      self.ir_other(drive, other, i)
+    time.sleep(self.tau_max) 
+    
+    
 
 
   
@@ -940,7 +953,8 @@ class Land:
     strega += "END Land   "+self.name+"   instance variables\n\n\n"
     return strega
     
-### FUNCTIONS THAT RETURN LAND OBJECTS   
+### FUNCTIONS THAT RETURN LAND OBJECTS  
+
 def Flatland(distance, prec):
   #@param   distance   is path length in Car.path units
   #@param   prec   is Land.delta_space for this Land object
@@ -974,11 +988,11 @@ texas.enter_car(camry, 0)
 rollo = to_ray(5, 0)
 cobra = to_ray(7, 7*DEG)
 
-print(str(rollo))
-print(str(cobra))
+#print(str(rollo))
+#print(str(cobra))
 
-for i in range(0):
-  texas.ir_other(manejar, otro, 0)
+for i in range(7):
+  texas.ir_otros([manejar], [otro])
   print(camry.str_power())
 
 
