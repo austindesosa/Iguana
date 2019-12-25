@@ -484,6 +484,7 @@ class Car:
     self.delta_tau = 0.0000000001 #Short time delay for actual time delays like time.sleep()
     self.t_poll = 0.1 #Short time delay for predicting the car‘s motion
     self.t_now = 0.0 #Amount of time car has been in motion
+    self.shape = Rectangle(5,3)
     
     
     
@@ -502,6 +503,7 @@ class Car:
     if (self.pwr_drive > 0 ):
       self.stop = 0
       self.brake = 0
+    self.shape.position = self.pos 
     #CODE NOTE: The instance variables self.path and self.delta_path are NOT affected
     #by the sweep() method, because sweep method does not handle the motion itself
     #and also because recalculating the displacement too often can lead to inaccurate results
@@ -565,6 +567,16 @@ class Car:
     self.pwr_drive = drivefunxion.out_val
     self.sweep() 
     self.go(delta_t)
+    
+  def go_other(self, drivefunxion, otherfunxion):
+    #@param   drivefunxion   is Funxion object
+    #representing self.pwr_drive as a function of Time
+    #@param   otherfunxion   is Funxion object
+    #representing self.pwr_other as a function of Energy   
+    otherfunxion.feed(self.energy)
+    self.pwr_other = otherfunxion.out_val
+    self.sweep()
+    self.go_drive(self.t_poll, drivefunxion)
 
     
   def travel_raw(self, dur, delta_t):
@@ -852,8 +864,21 @@ class Land:
     v = funxvec_2(self.ir, self.carvec,  self.carspacevec)
     time.sleep(self.tau_max)
 
-  def mymethod(self):
-    print("Land.mymethod() invoked\n\n")
+  def ir_other_raw(self, drivefunxion, otherfunxion, ndx_car):
+    print("Land.ir_other_raw invoked\n")
+    car = self.carvec[ndx_car]
+    self.sweep() 
+    car.go_other(drivefunxion, otherfunxion)
+    signum = 1
+    if car.rev:
+      signum *= -1
+    car.path += signum * car.delta_path 
+
+  def ir_other(self, drivefunxion, otherfunxion, ndx_car):
+    thr = threading.Thread(target = self.ir_other_raw, name="", args = (drivefunxion, otherfunxion, ndx_car))
+    thr.start()
+    
+
 
   
   def tostring(self):
@@ -875,18 +900,24 @@ class Land:
 
 ### TESTING SECTION
 
-camry = Car(1000, 2.5e5, 500*(25*MPH)**2)
-camry.rename("camry")
-tv = podvec(21, 10)
-hv = podvec(15*DEG, 10)
-ds = 0.9
-lago = Land(tv, hv, ds)
-lago.t_land = 0.1
-lago.sweep()
-lago.enter_car(camry, 0.07)
-print(camry.tostring())
+#Instantiate Car object
+camry_mass = 1000.0
+camry_energy = (camry_mass / 2)*((30*MPH)**2)
+camry_pwr = camry_energy * 0.15
+camry = Car(camry_mass, camry_pwr, camry_energy)
 
+camry.t_poll=0.2
+camry.sweep()
 
+#Declare Funxion objects
+manejar = Linear(0.3*camry_pwr, camry_pwr)
+otro = Ramp(-1 * camry_mass / 10)
+
+print(camry.str_power)
+for i in range(7):
+  camry.go_other(manejar, otro)
+  print(camry.str_power()) 
+  
 
 
 
