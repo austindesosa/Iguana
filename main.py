@@ -237,6 +237,12 @@ def always_one(x):
   Returns 1 no matter what'''
   return 1
 
+def kinetic(mass, speed):
+  '''<Mass>, <Speed> of moving particle in SI units   
+  Returns the Kinetic Energy of that particle, in watt-seconds
+  '''
+  return 0.5 * mass * (speed ** 2)
+
 def velocity(speed, helm):
   '''<Speed>, <Helm> of moving object in SI units 
   Returns phasor representing the velocity,
@@ -322,6 +328,14 @@ class Funxion:
     fu = self.copy() 
     fu.rename(new_name)
 
+  def litter(self, n):
+    '''<Number of desired copies> of this Funxion object
+    Returns list of Funxion objects containing <n> copies of this Funxion object'''
+    v=[]
+    for i in range(n):
+      v.append(self.copy())
+    return v   
+
   def scale(self, k):
     '''<Scaling factor>
     Returns Funxion object just like this one,
@@ -330,6 +344,31 @@ class Funxion:
       return k * self.funx(x)
     fu = Funxion(dummy, self.in_val)
     return fu
+
+  def scale_x(self, k):
+    '''<Scaling factor>
+    Returns Funxion object like this one 
+    except shrunk in the x-axis by a factor of <k>'''
+    def dummy(x):
+      return self.funx(k * x )
+    return Funxion(dummy, self.in_val)
+
+  def shift(self, k):
+    '''<Number>
+    Returns Funxion object like this one,
+    except with <k> units aded to the output'''
+    def dummy(x):
+      return k + self.funx(x )
+    return Funxion(dummy, self.in_val)
+
+  def shift_x(self, k):
+    '''<NUmber>
+    Returns FUnxion object like this one,
+    but representing y(x + <k>) instead of y(x)'''
+    def dummy(x):
+      return self.funx(x + k )   
+    return Funxion(dummy, self.in_val)
+
 
 
 
@@ -395,6 +434,23 @@ def ProdFunxion(funxionvec, in_val):
   fu = Funxion(dummy, 0)
   return fu
 
+def Heav(x_rise):
+  '''<Rise time> on independent axis   
+  Returns Funxion object representing unit step function
+  u(x - <x_rise>)'''
+  def dummy(x):
+    if x < x_rise:
+      return 0
+    else:
+      return 1
+  return Funxion(dummy, 0)
+
+def Pulse(x_rise, x_fall):
+  '''<Rise TIme>, <Fall Time> on independent axis   
+  Returns Funxion object representing rectangular pulse function'''
+  return SumFunxion([Heav(x_rise), Heav(x_fall).scale(-1)], 0)
+
+  
 
 ### OBSTACLE CLASS
 
@@ -847,6 +903,19 @@ class Land:
       self.frixvec.append(self.frixvec[-1])
       self.phasorvec.append(to_ray(self.delta_space, helm_v[i]))
     self.sweep()
+    
+  def concat(self, land):
+    print("Land.concat active\n\n")
+    size_og = 0+self.size
+    self.extend(land.tiltvec, land.helmvec)
+    self.sweep()
+    for i in range(size_og, self.size):
+      ix = i - size_og
+      fr = land.frixvec(ix)
+      self.frixvec[i].append(fr)
+    self.sweep()
+    print("Land.concat finished\n\n\n")
+    
 
     
   def enter_car(self, car, space):
@@ -982,6 +1051,7 @@ otro = Ramp(-1/8000)
 texas = Flatland( 0.125*MILE, 100)
 texas.extend([.01, .03], [.2, .4])
 texas.enter_car(camry, 0)
+
 
 #print(texas.tostring())
 
