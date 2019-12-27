@@ -450,6 +450,45 @@ def Pulse(x_rise, x_fall):
   Returns Funxion object representing rectangular pulse function'''
   return SumFunxion([Heav(x_rise), Heav(x_fall).scale(-1)], 0)
 
+def Exp():
+  '''Returns Funxion object representing 
+  equation y(x) = e^x'''
+  return Funxion(exp, 0)
+
+def Sinusoid(w, ph):
+  '''<Angular Frequency>, <Phase Shift>
+  Retuerns Funxion object representing sinusiodal function
+  y(x) = sin(<w> x + <ph> )'''
+  def dummy(x):
+    return sin( (w *x) + ph)
+  return Funxion(dummy, 0)
+
+def Pow(k):
+  '''<Power or exponent>
+  Returns Funxion object representing equationy(x) = x ^ <k> '''
+  def dummy(x):
+    return x**k
+  return Funxion(dummy, 0)
+
+def Log():
+  '''Returns Funxion object
+  representing natural logarithm function.
+  Uses absolute value of input to avoid crashing at negative numbers'''
+  def dummy(x):
+    return ln( abs(x) )
+  return Funxion(dummy, 1) #initial input is 1 instead of 0
+
+def Periodic(funx, period):
+  '''<Python function>, <Period>
+  Returns Funxion object representing periodic function
+  with period <period>, 
+  defined as y(x) = <funx>(x) for 0 <= x <= <period>'''
+  def dummy(x):
+    return funx(x % period   )  
+  return Funxion(dummy, 0)
+    
+
+
   
 
 ### OBSTACLE CLASS
