@@ -899,6 +899,9 @@ class Land:
     #assumed empty by default
     self.phasorvec = []
     self.carspacevec = []
+    #EXPERIMENTAL CODE   
+    self.othervec, self.drivevec = [],[]
+    #END EXPERIMENTAL CODE
     for i in range(self.size):
       ang = self.helmvec[i]*self.delta_space
       if abs(ang) < MIN_HELM:
@@ -995,6 +998,9 @@ class Land:
     Puts a Car object to interact with this Land object'''
     self.carvec.append(car)
     self.carspacevec.append(space )
+    #EXPERIMENTAL CODE   
+    self.drivevec.append(car.drive_fxn())
+    self.othervec.append(car.other_fxn())
     self.sweep()
 
     
@@ -1003,6 +1009,11 @@ class Land:
     Removes that Car from this Land object if it's in here'''
     if car in self.carvec:
       ndx = self.carvec.ndx( car  )
+      self.carvec.pop(ndx)
+      self.carspacvec.pop(ndx)
+      self.drivevec.pop(ndx)
+      self.othervec.pop(ndx)
+    self.sweep()
       
     
   def ir_raw(self, car,  space):
@@ -1073,6 +1084,23 @@ class Land:
       drive, other = drivevec[i], othervec[i]
       self.ir_other(drive, other, i)
     time.sleep(self.tau_max) 
+    
+  def ir_mios(self):
+    #Does self.ir_otros
+    #but using only the instance variables
+    #in this Land object
+    self.ir_otros(self.drivevec, self.othervec)
+    
+  def viaje(self, dur_t):
+    #@param   dur_t   is number of seconds
+    #of time you wish to simulate.  
+    #Iterates the method self.ir_mios
+    #for <dur_t> simulated seconds 
+    n = int(dur_t // self.t_land)
+    for i in range(n):
+      self.ir_mios()
+    self.sweep()
+    
     
     
 
