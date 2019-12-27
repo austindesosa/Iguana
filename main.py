@@ -967,8 +967,8 @@ class Land:
     self.sweep()
     for i in range(size_og, self.size):
       ix = i - size_og
-      fr = land.frixvec(ix)
-      self.frixvec[i].append(fr)
+      fr = land.frixvec[ix]
+      self.frixvec.append(fr)
     self.sweep()
     print("Land.concat finished\n\n\n")
     
@@ -1100,8 +1100,11 @@ camry_energy = kinetic(camry_mass, 10*MPH)
 camry_pwr = 0.3 * camry_energy
 
 camry = Car(camry_mass, camry_pwr, camry_energy)
-camry.frix_coeff = 0.15
-print(str(camry.frict_encaps(camry.energy)))
+
+texas = Land([0.6, 0.5, 0.4], [0.3, 0.2,0.1], LAND_PREC)
+kansas = Flatland(3.5*LAND_PREC, LAND_PREC)
+texas.concat(kansas)
+print(texas.tostring())
 
 
 
