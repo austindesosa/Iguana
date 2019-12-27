@@ -649,6 +649,22 @@ class Car:
     NOTE : <kin_eneergy> is a dummy parameter, 
     this function actually does all calculations using instance variables'''
     return self.friction(self.frix_coeff)
+    
+  def other_fxn(self):
+    #Returns default Funxion object  
+    #for use in Land objects
+    #to calculate self.pwr_other
+    #for this Car object   
+    return Funxion(self.frict_encaps, self.energy)
+    
+  def drive_fxn(self):
+    #Returns default Funxion object   
+    #for use in Land objects
+    #to output self.pwr_drive   
+    #for this Car object   
+    def dummy(t):
+      return self.pwr_drive  
+    return Funxion(dummy, self.t_now)
 
 
 
