@@ -592,6 +592,7 @@ class Car:
     self.t_poll = 0.1 #Short time delay for predicting the car‘s motion
     self.t_now = 0.0 #Amount of time car has been in motion
     self.shape = Rectangle(5,3)
+    self.frix_coeff = 0 #Coefficient of kinetic friction 
     
     
     
@@ -647,7 +648,7 @@ class Car:
     as a function for use in Funxion objects
     NOTE : <kin_eneergy> is a dummy parameter, 
     this function actually does all calculations using instance variables'''
-    return 0
+    return self.friction(self.frix_coeff)
 
 
 
@@ -1094,31 +1095,14 @@ def Flatland(distance, prec):
 ### TESTING SECTION
 
 #Instantiate Car object
-camry=Car(1000, 3000, 55000)
+camry_mass = 1000   
+camry_energy = kinetic(camry_mass, 10*MPH)
+camry_pwr = 0.3 * camry_energy
 
-camry.t_poll=0.2
-camry.sweep()
+camry = Car(camry_mass, camry_pwr, camry_energy)
+camry.frix_coeff = 0.15
+print(str(camry.frict_encaps(camry.energy)))
 
-#Declare Funxion objects
-manejar = Linear(777, 3000)
-otro = Ramp(-1/8000)
-
-texas = Flatland( 0.125*MILE, 100)
-texas.extend([.01, .03], [.2, .4])
-texas.enter_car(camry, 0)
-
-
-#print(texas.tostring())
-
-rollo = to_ray(5, 0)
-cobra = to_ray(7, 7*DEG)
-
-#print(str(rollo))
-#print(str(cobra))
-
-for i in range(7):
-  texas.ir_otros([manejar], [otro])
-  print(camry.str_power())
 
 
 
