@@ -486,10 +486,8 @@ def Periodic(funx, period):
   def dummy(x):
     return funx(x % period   )  
   return Funxion(dummy, 0)
-    
 
 
-  
 
 ### OBSTACLE CLASS
 
@@ -633,7 +631,25 @@ class Car:
       self.helm *= -1
       self.tilt *= -1
       self.pwr_grav *= -1
-    self.sweep()  
+    self.sweep() 
+
+  def friction(self, m_k):
+    '''<Coefficient of Kinetic Friction>
+    Calculates kinetic friction, in SI units, of this car
+    using the simple model taught in beginner-level physics'''
+    weight = GRAV * self.mass 
+    weight *= cos( self.tilt )
+    return -1 * abs(weight * self.speed  )
+
+  def frict_encaps(self, kin_energy):
+    '''<Kinetic Energy> in SI units   
+    Car.friction method, but encapsulated 
+    as a function for use in Funxion objects
+    NOTE : <kin_eneergy> is a dummy parameter, 
+    this function actually does all calculations using instance variables'''
+    return 0
+
+
 
   
 
