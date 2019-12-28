@@ -965,6 +965,16 @@ class Land:
       ray += curve_ray(last_space, last_space * h)
     return ray 
     
+  def drxn_space(self, space):
+    #@param   space   is a float
+    #   representing how far along the path of this Land object you are
+    #Returns direction phasor representing
+    #absolute direction your car is pointing,
+    #in radians rightward of due NORTH
+    drxn = eul(0) * self.compass
+    drxn *= self.point_ray(space)
+    return drxn
+    
   def extend(self, tilt_v, helm_v ):
     #Adds more points to this Land object
     #@param   tilt_v   is list of values
@@ -1145,10 +1155,18 @@ camry_pwr = 0.3 * camry_energy
 
 camry = Car(camry_mass, camry_pwr, camry_energy)
 
+
 texas = Land([0.6, 0.5, 0.4], [0.3, 0.2,0.1], LAND_PREC)
 kansas = Flatland(3.5*LAND_PREC, LAND_PREC)
 texas.concat(kansas)
-print(texas.tostring())
+#print(texas.tostring())
+texas.enter_car(camry, 0)
+#ChangeFunxion lists of Land object
+texas.othervec = Konstant(100).litter(1)
+texas.drivevec = Konstant(5678).litter(1)
+#Run simulation
+camry.tell_motion(5*camry.delta_tau, camry.delta_tau)
+texas.viaje(5*texas.t_land)
 
 
 
