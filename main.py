@@ -953,8 +953,11 @@ class Land:
         curv_r = 1.0 / self.helmvec[i]
         self.phasorvec[i] = curve_ray(ang, curv_r)
     while( len(self.phasorvec) > self.size):
-      self.phasorvec.pop[-1]
+      self.phasorvec.pop(-1)
     self.ray = sum(self.phasorvec)
+    #EXPERIMENTAL CODE
+    self.tilt_avg = avg(self.tiltvec)
+    self.helm_avg = avg(self.helmvec)
 
   def point_ray(self, space):
     '''<Distance travelled> along path represnted by theis Land object
@@ -1016,7 +1019,7 @@ class Land:
     pasado = 0 + 0.0   
     tv, hv, frv = [],[],[]
     while( pasado < totalspace):
-      ndx = ndx_point(pasado)
+      ndx = self.ndx_point(pasado)
       tv.append(self.tiltvec[ndx])
       hv.append(self.helmvec[ndx])
       frv.append(self.frixvec[ndx])
@@ -1024,7 +1027,11 @@ class Land:
     self.delta_space = prec   
     self.tiltvec = tv   
     self.helmvec = hv   
-    self.frixvec = frv   
+    self.frixvec = frv  
+    #EXPERIMENTAL CODE to stop it from crashing
+    while( len(self.phasorvec) < len(self.helmvec)):
+      self.phasorvec.append(0)
+    #END EXPERIMENTAL CODE
     self.sweep()
     
   def constant_tilt(self, tilt):
@@ -1222,20 +1229,15 @@ camry_mass = 1000
 camry_energy = kinetic(camry_mass, 10*MPH)
 camry_pwr = 0.3 * camry_energy
 
-camry = Car(camry_mass, camry_pwr, camry_energy)
+camry = Car(camry_mass, camry_pwr,camry_energy)
 
-
-texas = Land([0.6, 0.5, 0.4], [0.3, 0.2,0.1], LAND_PREC)
-kansas = Flatland(3.5*LAND_PREC, LAND_PREC)
-texas.concat(kansas)
-#print(texas.tostring())
-texas.enter_car(camry, 0)
-#ChangeFunxion lists of Land object
-texas.othervec = Konstant(100).litter(1)
-texas.drivevec = Konstant(5678).litter(1)
-#Run simulation
-camry.tell_motion(5*camry.delta_tau, camry.delta_tau)
-texas.viaje(5*texas.t_land)
+kansas = Flatland(3.5, LAND_PREC)
+print(kansas.tostring())
+kansas.conform(2)
+kansas.constant_tilt(0.09)
+kansas.constant_helm(0.24)
+kansas.constant_frix(0.17)
+print(kansas.tostring())
 
 
 
