@@ -1166,6 +1166,26 @@ def Flatland(distance, prec):
   return kans
         
 
+def Funxionland(tiltfunxion, helmfunxion, mileage):
+  #@param   tiltfunxion   is Funxion object representing
+  #   tilt vs. path   
+  #@param   helmfunxion   is Funxion object representing
+  #   helm vs. path
+  #@param   mileage   is lengthof the path,
+  #   in meters, represented by this Land object   
+  #Returns Land object representing oath <mikeage> meters ling,
+  #where the tilt and helm are determined by 
+  #<tiltfunxion> and <he,mfunxion>, respectively
+  n = 1 + int(mileage // LAND_PREC)
+  xv = []
+  for i in range(n):
+    xv.append( i * LAND_PREC)
+  tv = funxvec(tiltfunxion.funx, xv)
+  hv= funxvec(helmfunxion.funx, xv)
+  return Land(tv  hv, LAND_PREC)
+
+
+
 ### TESTING SECTION
 
 #Instantiate Car object
