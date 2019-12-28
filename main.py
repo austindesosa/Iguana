@@ -912,6 +912,13 @@ class Land:
     self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
     self.tau_max = .00001 #Processor time constant
     self.t_land = .01 #Polling rate, in simulated seconds, for Car objects in this Land 
+    #EXPERIMENTAL INSTANCE VARIABLES   
+    self.outlandvec=[]
+    self.outangvec=[]
+    self.inlandvec=[]
+    self.inspacevec=[]
+    self.has_in = 0 #boolean, only true if other Land objects frow into this one
+    self.has_out = 0 #boolean, only true if this Land object flows into others
     
     
   def ndx_point(self, path):
@@ -1020,6 +1027,28 @@ class Land:
     self.frixvec = frv   
     self.sweep()
     
+  def constant_tilt(self, tilt):
+    #Sets this Land objects tilt vakues
+    #to <tilt> at every point   
+    for i in range(self.size):
+      self.tiltvec[i] = tilt
+    self.sweep()
+    
+  def constant_helm(self, helm):
+    #Sets this Land object’s selm values
+    #to <helm> at every point   
+    for i in range(self.size):
+      self.helmvec[i] = helm
+    self.sweep()
+    
+  def constant_frix(self, frix):
+    #Sets this Land object’s friction coefficients
+    #to <frix> at every piint   
+    for i in range(self.size):
+      self.frixvec[i] = frix
+    self.sweep()
+    
+      
     
 
     
@@ -1182,7 +1211,7 @@ def Funxionland(tiltfunxion, helmfunxion, mileage):
     xv.append( i * LAND_PREC)
   tv = funxvec(tiltfunxion.funx, xv)
   hv= funxvec(helmfunxion.funx, xv)
-  return Land(tv  hv, LAND_PREC)
+  return Land(tv,  hv, LAND_PREC)
 
 
 
