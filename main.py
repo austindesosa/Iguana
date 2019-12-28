@@ -1001,6 +1001,26 @@ class Land:
     self.sweep()
     print("Land.concat finished\n\n\n")
     
+  def conform(self, prec):
+    #@param   prec   is new value for self.delta_space
+    #Makes it so this Land object has self.delta_space = <prec>
+    #but it represents the same Physical characteristics of this Land object.
+    totalspace = self.delta_space * self.size   
+    pasado = 0 + 0.0   
+    tv, hv, frv = [],[],[]
+    while( pasado < totalspace):
+      ndx = ndx_point(pasado)
+      tv.append(self.tiltvec[ndx])
+      hv.append(self.helmvec[ndx])
+      frv.append(self.frixvec[ndx])
+      pasado += prec   
+    self.delta_space = prec   
+    self.tiltvec = tv   
+    self.helmvec = hv   
+    self.frixvec = frv   
+    self.sweep()
+    
+    
 
     
   def enter_car(self, car, space):
