@@ -975,7 +975,7 @@ class Land:
       ray += curve_ray(last_space, last_space * h)
     return ray 
     
-  def drxn_space(self, space):
+  def drxn_ray(self, space):
     #@param   space   is a float
     #   representing how far along the path of this Land object you are
     #Returns direction phasor representing
@@ -1166,6 +1166,36 @@ class Land:
     for i in range(n):
       self.ir_mios()
     self.sweep()
+    
+  def outflow(self, land, ang):
+    #@param   land   is Land object representing
+    #   one of the forks at the end of theroad
+    #   represented by this Land object.
+    #@param   ang   is angle, in helm units,
+    #   at which <land> crosses this Land’s path
+    #Makes this Land object recognize recognize
+    #<land> as one of the forks at the end of the road.
+    self.outlandvec.append(land)  
+    self.outangvec.append(ang) 
+    land.inlandvec.append(self)
+    land.inspacevec.append(0)
+    self.has_out = 1 
+    land.has_in = 1 
+    land.sweep()
+    self.sweep()
+    
+  def inflow(self, land, space):
+    #@param   land   is another Land object 
+    #   that you want to make flow into this Land.  
+    #@param   space   is point where you intend to 
+    #   enter this other Land object, in Car.path units.
+    #Makes this Land object recognize <land> as representing
+    #a road that joins into this one.
+    drxn_in = land.drxn_ray(land.delta_space * land.size)
+    drxn_here = self.drxn_ray(space)
+    cross_ang = angle(drxn_here / drxn_in)
+    land.outflow(self, cross_ang)
+    
     
     
     
