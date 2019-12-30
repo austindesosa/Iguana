@@ -10,7 +10,7 @@ INF=math.inf
 pi, e, deg, inf = PI, E, DEG, INF
 JIM = complex(0,1)
 
-MIN_HELM = 0.000001 * DEG # curves WITH LESS HELM THAN THIS
+MIN_HELM = 0.0000001 * DEG # curves with less helm than this
 # can be considered straight lines
 
 LAND_PREC = 0.1 # Recommended value for Land.delta_space
@@ -58,8 +58,8 @@ def xmult(lhop, x1, x2):
   '''《lHospial limit》, 《scalar》, 《other scalar》
   lhop is winner of l'Hospital's
   rule
-  Multiplies the two POSSIBLY INFINITE scalars 《x1》 and 《x2》 in accoRdance with whatever lHospital's rule
-  says 0*inf would be (see MATH NOTE above)
+  Multiplies the two POSSIBLY INFINITE scalars 《x1》 and 《x2》 in accordance with whatever lHospital's rule
+  says 0*inf would be in this situation
   '''
   if 0 in [x1, x2]:
     if inf in [x1, x2]:
@@ -478,13 +478,13 @@ def Log():
     return ln( abs(x) )
   return Funxion(dummy, 1) #initial input is 1 instead of 0
 
-def Periodic(funx, period):
-  '''<Python function>, <Period>
+def Periodic(funxion, period):
+  '''<Funxion object>, <Period>
   Returns Funxion object representing periodic function
   with period <period>, 
-  defined as y(x) = <funx>(x) for 0 <= x <= <period>'''
+  defined as y(x) = <funxion>.funx(x) for 0 <= x <= <period>'''
   def dummy(x):
-    return funx(x % period   )  
+    return funxion.funx(x % period   )  
   return Funxion(dummy, 0)
 
 
@@ -719,10 +719,10 @@ class Car:
     self.go(delta_t)
     
   def go_other(self, drivefunxion, otherfunxion): 
-    #@param   drivefunxion   is Funxion object
+    '''#@param   drivefunxion   is Funxion object
     #representing self.pwr_drive as a function of Time
     #@param   otherfunxion   is Funxion object
-    #representing self.pwr_other as a function of Energy   
+    #representing self.pwr_other as a function of Energy'''   
     otherfunxion.feed(self.energy)
     self.pwr_other = otherfunxion.out_val
     self.sweep()
@@ -803,7 +803,6 @@ class Car:
 
 
   def tell_motion_raw(self, dur, d_tau):
-    #UNTESTED
     '''<Duration> in seconds you want to run this method, <Polling Period> in seconds between print statements
     Prints attrributes related to the motion of the car every <d_tau> seconds, 
     until <dur> seconds have elapsed'''
@@ -862,6 +861,7 @@ class Car:
     strega += "self.pwr_net = "+str(self.pwr_net)+"  watts\n"
     strega += "self.tilt = "+str(self.tilt)+"  radians downhill\n"
     strega += "self.mass = "+str(self.mass)+"  kilograms\n"
+    strega += "self.frix_coeff = "+str(self.frix_coeff)+"  unitless\n"
     strega += "self.stop = "+str(self.stop)+"  boolean\n"
     strega += "self.brake = "+str(self.brake)+"  boolean\n"
     strega += "self.rev = "+str(self.rev)+"  boolean\n"
@@ -894,6 +894,9 @@ class Land:
     self.size = min(len(self.tiltvec), len(self.helmvec)) # vec
     self.frixvec = podvec(0, self.size) #holds coefficients of friction
     #in case I ever want to model that
+    #EXPERIMENTAL CODE    
+    self.frix_avg = avg(self.frixvec)  
+    #END EXPERIMENTAL CODE     
     self.compass = NORTH #orientation of the land AKA driver’s direction upon entering, as a unit phasor, assumed NORTH by default
     self.carvec = [] #list of Car objects inteacting with this Land object
     #assumed empty by default
@@ -916,6 +919,7 @@ class Land:
     self.outlandvec=[]
     self.outangvec=[]
     self.inlandvec=[]
+    self.inangvec=[]
     self.inspacevec=[]
     self.has_in = 0 #boolean, only true if other Land objects frow into this one
     self.has_out = 0 #boolean, only true if this Land object flows into others
@@ -926,7 +930,7 @@ class Land:
     Returns index of self.tiltvec and self.helmvec corresponding to that point along the path
     '''
     n = int(path // self.delta_space)
-    n = min(n, self.size)
+    n = min(n, self.size - 1)
     return n 
 
   def sweep(self):
@@ -958,6 +962,7 @@ class Land:
     #EXPERIMENTAL CODE
     self.tilt_avg = avg(self.tiltvec)
     self.helm_avg = avg(self.helmvec)
+    self.frix_avg = avg(self.frixvec)
 
   def point_ray(self, space):
     '''<Distance travelled> along path represnted by theis Land object
@@ -982,8 +987,26 @@ class Land:
     #absolute direction your car is pointing,
     #in radians rightward of due NORTH
     drxn = eul(0) * self.compass
-    drxn *= self.point_ray(space)
+    ndx = self.ndx_point(space)
+    for i in range(ndx):
+      drxn *= eul(self.delta_space * self.helmvec[i])
+    ds_last = space - (ndx * self.delta_space)
+    drxn *= eul(ds_last * self.helmvec[ndx])
     return drxn
+
+  def recompass(self, new_compass):
+    '''<Direction phasor> representing new value for self.new_compass
+    Reorients this Land object and the cars in it'''
+    redrxn = new_compass / self.compass 
+    self.compass = new_compass    
+    for car in self.carvec:
+      car.shape.orientation *= redrxn
+    self.sweep() 
+
+  def endspace(self):
+    '''Returns toal amount of distance travelled
+    on road represented by this Land, in Car.path units'''
+    return self.delta_space * self.size
     
   def extend(self, tilt_v, helm_v ):
     #Adds more points to this Land object
@@ -1080,6 +1103,8 @@ class Land:
       self.drivevec.pop(ndx)
       self.othervec.pop(ndx)
     self.sweep()
+
+  
       
     
   def ir_raw(self, car,  space):
@@ -1167,7 +1192,7 @@ class Land:
       self.ir_mios()
     self.sweep()
     
-  def outflow(self, land, ang):
+  def inflow(self, land, space):
     #@param   land   is Land object representing
     #   one of the forks at the end of theroad
     #   represented by this Land object.
@@ -1175,26 +1200,26 @@ class Land:
     #   at which <land> crosses this Land’s path
     #Makes this Land object recognize recognize
     #<land> as one of the forks at the end of the road.
-    self.outlandvec.append(land)  
-    self.outangvec.append(ang) 
-    land.inlandvec.append(self)
-    land.inspacevec.append(0)
-    self.has_out = 1 
-    land.has_in = 1 
+    self.has_in, self.has_out = 1,1
+    drxn_in=land.drxn_ray(land.endspace())
+    drxn_me = self.drxn_ray(space)
+    ang = angle(drxn_me / drxn_in) 
+    land.outangvec.append(ang)
+    self.inangvec.append(-1*ang)
+    land.outlandvec.append(self)
+    self.inlandvec.append(land)
+    self.inspacevec.append(space)
     land.sweep()
     self.sweep()
     
-  def inflow(self, land, space):
+  def outflow(self, land):
     #@param   land   is another Land object 
     #   that you want to make flow into this Land.  
     #@param   space   is point where you intend to 
     #   enter this other Land object, in Car.path units.
     #Makes this Land object recognize <land> as representing
     #a road that joins into this one.
-    drxn_in = land.drxn_ray(land.delta_space * land.size)
-    drxn_here = self.drxn_ray(space)
-    cross_ang = angle(drxn_here / drxn_in)
-    land.outflow(self, cross_ang)
+    land.inflow(self, 0)
     
     
     
@@ -1209,12 +1234,19 @@ class Land:
     strega += "self.tiltvec = "+str(self.tiltvec)+"\n"
     strega += "self.helm_avg = "+str(self.helm_avg)+"\n"
     strega += "self.helmvec = "+str(self.helmvec)+"\n"
+    strega += "self.frix_avg = "+str(self.frixvec)+"\n"
+    strega += "self.frixvec = "+str(self.frixvec)+"\n"
     strega += "self.ray = "+str(self.ray)+"\n"
     strega += "self.phasorvec = "+str(self.phasorvec)+"\n"
     strega += "self.compass = "+str(self.compass)+"\n"
     strega += "self.carvec = "+str(self.carvec)+"\n"
     strega += "self.tau_max = "+str(self.tau_max)+"\n"
     strega += "self.t_land = "+str(self.t_land)+"\n"
+    strega += "self.inlandvec = "+str(self.inlandvec)+"\n"
+    strega += "self.inspacevec = "+str(self.inspacevec)+"\n"
+    strega += "self.inangvec = "+str(self.inangvec)+"\n"
+    strega += "self.outlandvec = "+str(self.outlandvec)+"\n"
+    strega += "self.outangvec = "+str(self.outangvec)+"\n"
     strega += "END Land   "+self.name+"   instance variables\n\n\n"
     return strega
     
@@ -1233,7 +1265,7 @@ def Flatland(distance, prec):
         
 
 def Funxionland(tiltfunxion, helmfunxion, mileage):
-  #@param   tiltfunxion   is Funxion object representing
+  '''#@param   tiltfunxion   is Funxion object representing
   #   tilt vs. path   
   #@param   helmfunxion   is Funxion object representing
   #   helm vs. path
@@ -1241,7 +1273,7 @@ def Funxionland(tiltfunxion, helmfunxion, mileage):
   #   in meters, represented by this Land object   
   #Returns Land object representing oath <mikeage> meters ling,
   #where the tilt and helm are determined by 
-  #<tiltfunxion> and <he,mfunxion>, respectively
+  #<tiltfunxion> and <helmfunxion>, respectively'''
   n = 1 + int(mileage // LAND_PREC)
   xv = []
   for i in range(n):
@@ -1250,7 +1282,25 @@ def Funxionland(tiltfunxion, helmfunxion, mileage):
   hv= funxvec(helmfunxion.funx, xv)
   return Land(tv,  hv, LAND_PREC)
 
+def Uniformland(tilt, helm, mileage):
+  '''<<Tilt>, <Helm>, <Distance covered> in Car.path units   
+  Returns Land object with the same tilt and helm throughout, 
+  for <mileage> meters'''
+  return Funxionland(Konstant(tilt), Konstant(helm), mileage)
 
+def Straighthill(tiltvec):
+  '''<List of tilt values>
+  Returns Land object representing a perfectly straight road
+  on sloped land'''
+  helmvec = podvec(0, len(tiltvec))
+  return Land(tiltvec, helmvec, LAND_PREC)
+
+def Flatcurve(helmvec):
+  '''<List of helm values>
+  Returns Land object representing a curved road
+  on perfectly flat ground'''
+  tiltvec = podvec(0, len(helmvec))
+  return Land(tiltvec, helmvec, LAND_PREC)
 
 ### TESTING SECTION
 
@@ -1261,13 +1311,24 @@ camry_pwr = 0.3 * camry_energy
 
 camry = Car(camry_mass, camry_pwr,camry_energy)
 
-kansas = Flatland(3.5, LAND_PREC)
-print(kansas.tostring())
-kansas.conform(2)
-kansas.constant_tilt(0.09)
-kansas.constant_helm(0.24)
-kansas.constant_frix(0.17)
-print(kansas.tostring())
+denny = Straighthill([0.1, 0.2, -0.3])
+northgate = Flatcurve([0.04, 0.05, -0.06])
+#denny.rename("denny")
+#northgate.rename("northgate")
+denny.recompass(eul(45 * DEG))
+northgate.outflow(denny)
+
+strega = "   northgate   is upstream,   denny   is downstream\n\n"
+strega += "northgate.outangvec = "+str(northgate.outangvec)+"\n"
+strega += "northgate.outlandvec = "+str(northgate.outlandvec)+"\n\n\n"
+strega += "denny.inangvec = "+str(denny.inangvec)+"\n"
+strega += "denny.inspacevec = "+str(denny.inspacevec)+"\n"
+strega += "denny.inlandvec = "+str(denny.inlandvec)+"\n\n\n"
+
+print(strega) 
+
+
+
 
 
 
