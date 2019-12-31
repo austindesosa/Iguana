@@ -1306,7 +1306,42 @@ class Land:
           if xi not in v_con:
             v_con.append(xi)
         v_sizes.append(len(v_con))
-    return v_con
+    return v_con   
+
+  def connectvec_out(self):
+    v_out = [self]
+    v_sizes = [len(v_out)]
+    for x1 in v_out:
+      for x2 in x1.outlandvec:
+        if x2 not in v_out:
+          v_out.append(x2)
+    v_sizes.append(len(v_out))
+    while( v_sizes[-1] != v_sizes[-2]):
+      for x in v_out:
+        for y in x.outlandvec:
+          if y not in v_out:
+            v_out.append(y)   
+      v_sizes.append(len(v_out))
+    return v_out
+
+  def connectvec_in(self):
+    v_in = [self] 
+    v_sizes = [len(v_in)]
+    for x1 in v_in:
+      for x2 in x1.inlandvec:
+        if x2 not in v_in:
+          v_in.append(x2)
+    v_sizes.append(len(v_in))
+    while(v_sizes[-1] != v_sizes[-2]):
+      for x in v_in:
+        for y in x.inlandvec:
+          if y not in v_in:
+            v_in.apend(y)
+      v_sizes.append(len(v_in))
+    return v_in
+
+
+    
     
     
 
@@ -1403,14 +1438,22 @@ def Flatcurve(helmvec):
 ### TERRAIN CLASS     
 class Terrain:
 
-  def __init__(self, land_center, place_center):
-    '''<Land object> , <Positon phasor>
-    <land_center> is Land object which will be used as a refernce for all Land objects 
-    and their connections in this Terrain object, 
-    <place_center> is phasor position at entrance of <land_center>, 
-    in same units as Car.pos and Obstacle.position'''
+  def __init__(self, land_center):
+    '''<Land object> 
+    <land_center> is Land object which will be used as a reference for all Land objects 
+    and their connections in this Terrain object'''
     self.land_center = land_center
-    self.place_center = place_center
+    self.direction = self.land_center.compass
+    self.place_center = 0*eul(0)
+    self.landvec = self.land_center.connectvec()
+    self.tau_center = self.land_center.tau_max #processor time constant
+    self.t_terrain = self.land_center.t_land #simulation time constant
+    self.t_life = 0 + 0.0 #Equivalent to Car.t_now
+    for land in self.landvec:
+      land.tau_max = self.tau_center   
+      land.t_land = self.t_terrain
+      land.conform(self.land_center.delta_space)
+      land.sweep()
 
 ### TESTING SECTION
 
@@ -1438,9 +1481,9 @@ for i1 in range(6):
   out_7[i1].outflow(out_7[i1+1])
   in_7[i1].inflow(in_7[i1+1],0)
 denny.outflow(out_7[-1])
-denny.inflow(in_7[-1], 0)
+denny.inflow(in_7[0], 0)
 
-print(str(denny.connectvec()))
+print(str(denny.connectvec_in()))
 
 
 
