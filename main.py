@@ -196,6 +196,14 @@ def riemvec(ti, tf, n):
     v.append(x)
   return v
 
+def copy(vec ):
+  '''<Python list>
+  Returns copy of this list'''
+  v=[]
+  for i in range(len(vec)):
+    v.append(vec[i])
+  return v
+
 ### MATH FUNCTIONS FOR THIS PROGRAM
 
 #WARNING:  curve_ray   doesn't work on perfectly straight lines.
@@ -1193,13 +1201,13 @@ class Land:
     self.sweep()
     
   def inflow(self, land, space):
-    #@param   land   is Land object representing
+    '''#@param   land   is Land object representing
     #   one of the forks at the end of theroad
     #   represented by this Land object.
-    #@param   ang   is angle, in helm units,
-    #   at which <land> crosses this Land’s path
+    #@param   space   is point, in Car.path units,
+    #   at which <land> flows into this Land
     #Makes this Land object recognize recognize
-    #<land> as one of the forks at the end of the road.
+    #<land> as one of the roads joining into this one'''
     self.has_in, self.has_out = 1,1
     drxn_in=land.drxn_ray(land.endspace())
     drxn_me = self.drxn_ray(space)
@@ -1213,13 +1221,101 @@ class Land:
     self.sweep()
     
   def outflow(self, land):
-    #@param   land   is another Land object 
-    #   that you want to make flow into this Land.  
-    #@param   space   is point where you intend to 
-    #   enter this other Land object, in Car.path units.
+    '''#@param   land   is another Land object 
+    #   that you want to make flow out of this Land.  
     #Makes this Land object recognize <land> as representing
-    #a road that joins into this one.
+    #one of the forks at the end of the road'''
     land.inflow(self, 0)
+
+  def has_fanout(self):
+    '''Boolean, returns True
+    only if the outflows have outflows'''
+    v = []
+    for x in self.outlandvec:
+      v.append(len(self.outlandvec))
+    return (sum(v) > 0)
+
+  def has_fanin(self):
+    '''Boolean, returns True
+    only if the inflows have inflows'''
+    v = []
+    for x in self.inlandvec:
+      v.append(len(x.inlandvec))
+    return (sum(v) > 0)
+
+  def connectvec_1(self):
+    v = [self]
+    for inland in self.inlandvec:
+      if inland not in v:
+        v.append(inland)
+    for outland in self.outlandvec:
+      if outland not in v:
+        v.append(outland)
+    return v
+
+  def connectvec_2(self):
+    v = self.connectvec_1()
+    for outland in self.outlandvec:
+      v_out = self.connectvec_1()   
+      for x_out in v_out:
+        if x_out not in v:
+          v.append(x_out)
+    for inland in self.inlandvec:
+      v_in = inland.connectvec_1()
+      for x_in in v_in:
+        if x_in not in v:
+          v.append(x_in)
+    return v     
+
+  def connectvec_3(self):
+    v = self.connectvec_2()     
+    v_land = copy(v)     
+    for land in v:
+      for outland in land.outlandvec:
+        if outland not in v_land:
+          v_land.append(land)
+      for inland in land.inlandvec:
+        if inland not in v_land:
+          v_land.append(inland)
+    connectmat = []
+    for x in v_land:
+      connectmat.append(x.connectvec_2())
+    for row in connectmat:
+      for i in range(len(row)):
+        if row[i] not in v_land:
+          v_land.append(row[i])
+    return v_land
+    
+  def connectvec(self):
+    '''Returns list of all the Land objects connected to this one, connected to their connections, etc.'''
+    v_con = [self] 
+    v_sizes = [len(v_con)]
+    for x_out in self.outlandvec:
+      if x_out not in v_con:
+        v_con.append(x_out)
+    for x_in in self.inlandvec:
+      if x_in not in v_con:
+        v_con.append(x_in)
+    v_sizes.append(len(v_con))
+    while(v_sizes[-1] != v_sizes[-2]):
+      for con in v_con:
+        for xo in con.outlandvec:
+          if xo not in v_con:
+            v_con.append(xo)
+        for xi in con.inlandvec:
+          if xi not in v_con:
+            v_con.append(xi)
+        v_sizes.append(len(v_con))
+    return v_con
+    
+    
+
+
+      
+
+
+
+
     
     
     
@@ -1247,6 +1343,8 @@ class Land:
     strega += "self.inangvec = "+str(self.inangvec)+"\n"
     strega += "self.outlandvec = "+str(self.outlandvec)+"\n"
     strega += "self.outangvec = "+str(self.outangvec)+"\n"
+    strega += "self.has_out = "+str(self.has_out)+"\n"
+    strega += "self.has_in = "+str(self.has_in)+"\n"
     strega += "END Land   "+self.name+"   instance variables\n\n\n"
     return strega
     
@@ -1302,6 +1400,18 @@ def Flatcurve(helmvec):
   tiltvec = podvec(0, len(helmvec))
   return Land(tiltvec, helmvec, LAND_PREC)
 
+### TERRAIN CLASS     
+class Terrain:
+
+  def __init__(self, land_center, place_center):
+    '''<Land object> , <Positon phasor>
+    <land_center> is Land object which will be used as a refernce for all Land objects 
+    and their connections in this Terrain object, 
+    <place_center> is phasor position at entrance of <land_center>, 
+    in same units as Car.pos and Obstacle.position'''
+    self.land_center = land_center
+    self.place_center = place_center
+
 ### TESTING SECTION
 
 #Instantiate Car object
@@ -1316,16 +1426,23 @@ northgate = Flatcurve([0.04, 0.05, -0.06])
 #denny.rename("denny")
 #northgate.rename("northgate")
 denny.recompass(eul(45 * DEG))
-northgate.outflow(denny)
+#northgate.outflow(denny)
 
-strega = "   northgate   is upstream,   denny   is downstream\n\n"
-strega += "northgate.outangvec = "+str(northgate.outangvec)+"\n"
-strega += "northgate.outlandvec = "+str(northgate.outlandvec)+"\n\n\n"
-strega += "denny.inangvec = "+str(denny.inangvec)+"\n"
-strega += "denny.inspacevec = "+str(denny.inspacevec)+"\n"
-strega += "denny.inlandvec = "+str(denny.inlandvec)+"\n\n\n"
+out_7, in_7  = [],[]
+for i in range(7):
+  leroy = Uniformland(0.1, 0.07, 7)
+  out_7.append(leroy)
+  larry = Uniformland(0.1, 0.07, 7)
+  in_7.append(larry)
+for i1 in range(6):
+  out_7[i1].outflow(out_7[i1+1])
+  in_7[i1].inflow(in_7[i1+1],0)
+denny.outflow(out_7[-1])
+denny.inflow(in_7[-1], 0)
 
-print(strega) 
+print(str(denny.connectvec()))
+
+
 
 
 
