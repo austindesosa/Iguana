@@ -909,9 +909,11 @@ class Land:
     self.carvec = [] #list of Car objects inteacting with this Land object
     #assumed empty by default
     self.phasorvec = []
-    self.carspacevec = []
-    #EXPERIMENTAL CODE   
+    self.carspacevec = [] 
     self.othervec, self.drivevec = [],[]
+    #EXPERIMENTAL CODE
+    self.land_position = 0*eul(0)  #Absolute position of this Land's startpoint,
+    #in same units as Obstacle.position
     #END EXPERIMENTAL CODE
     for i in range(self.size):
       ang = self.helmvec[i]*self.delta_space
@@ -921,8 +923,8 @@ class Land:
         curv_r = 1.0 / abs(self.helmvec[i])
         self.phasorvec.append(curve_ray(ang, curv_r))
     self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
-    self.tau_max = .00001 #Processor time constant
-    self.t_land = .01 #Polling rate, in simulated seconds, for Car objects in this Land 
+    self.tau_max = 0 #Processor time constant
+    self.t_land = 1/50 #Polling rate, in simulated seconds, for Car objects in this Land 
     #EXPERIMENTAL INSTANCE VARIABLES   
     self.outlandvec=[]
     self.outangvec=[]
@@ -1015,6 +1017,19 @@ class Land:
     '''Returns toal amount of distance travelled
     on road represented by this Land, in Car.path units'''
     return self.delta_space * self.size
+
+  def reposition(self, entrance_pos):
+    '''<Absolute position> of this Land's startpoint, in same units as Obstacle.position
+    CHanges the startpoint of this Land object,
+    and adjusts Car.pos and Car.obst.position for every Car in here'''
+    self.land_position = entrance_pos
+    for car in self.carvec:
+      ndx_car = self.carvec.index(car)
+      z = self.point_ray(self.carspacevec[ndx_car])
+      car.pos = z + self.land_position
+      car.sweep()
+    self.sweep()
+
     
   def extend(self, tilt_v, helm_v ):
     #Adds more points to this Land object
@@ -1166,7 +1181,8 @@ class Land:
     signum = 1
     if car.rev:
       signum *= -1
-    car.path += signum * car.delta_path 
+    #car.path += signum * car.delta_path
+    self.carspacevec[ndx_car] += signum * car.delta_path 
 
   def ir_other(self, drivefunxion, otherfunxion, ndx_car):
     thr = threading.Thread(target = self.ir_other_raw, name="", args = (drivefunxion, otherfunxion, ndx_car))
@@ -1191,13 +1207,22 @@ class Land:
     self.ir_otros(self.drivevec, self.othervec)
     
   def viaje(self, dur_t):
-    #@param   dur_t   is number of seconds
+    '''#@param   dur_t   is number of seconds
     #of time you wish to simulate.  
     #Iterates the method self.ir_mios
-    #for <dur_t> simulated seconds 
+    #for <dur_t> simulated seconds''' 
     n = int(dur_t // self.t_land)
     for i in range(n):
       self.ir_mios()
+    self.sweep()
+
+  def repitar(self, dur_t):
+    '''<Number> of seconds of simulated time
+    Repeats the method self.ir_todos for
+    <dur_t> simulated seconds'''
+    n = int(dur_t // self.t_land)
+    for i in range(n):
+      self.ir_todos()   
     self.sweep()
     
   def inflow(self, land, space):
@@ -1459,33 +1484,38 @@ class Terrain:
 
 #Instantiate Car object
 camry_mass = 1000   
-camry_energy = kinetic(camry_mass, 10*MPH)
+camry_energy = kinetic(camry_mass, 65*MPH)
 camry_pwr = 0.3 * camry_energy
 
-camry = Car(camry_mass, camry_pwr,camry_energy)
+camry = Car(camry_mass, 0, camry_energy)
+toyota = Car(camry_mass, 0, camry_energy)
+kansas = Uniformland(0,0,MILE)
+strega = ""
 
-denny = Straighthill([0.1, 0.2, -0.3])
-northgate = Flatcurve([0.04, 0.05, -0.06])
-#denny.rename("denny")
-#northgate.rename("northgate")
-denny.recompass(eul(45 * DEG))
-#northgate.outflow(denny)
-
-out_7, in_7  = [],[]
-for i in range(7):
-  leroy = Uniformland(0.1, 0.07, 7)
-  out_7.append(leroy)
-  larry = Uniformland(0.1, 0.07, 7)
-  in_7.append(larry)
-for i1 in range(6):
-  out_7[i1].outflow(out_7[i1+1])
-  in_7[i1].inflow(in_7[i1+1],0)
-denny.outflow(out_7[-1])
-denny.inflow(in_7[0], 0)
-
-print(str(denny.connectvec_in()))
+kansas.enter_car(camry,0)
+kansas.enter_car(toyota, 10)
+t_1 = 0 + time.time()
+kansas.repitar(1)
+t_2 = 0 + time.time()  
+dt = t_2 - t_1
+strega += "time elapsed for Land.repitar:  "+str(dt)+"  seconds\n\n"
 
 
+strega += "kansas.land_position = "+str(kansas.land_position)+"\n"
+strega+="camry.shape.position = "+str(camry.shape.position)+"\n"
+strega+="toyota.shape.position = "+str(toyota.shape.position)+"\n\n"
+#print(strega)
+
+kansas.reposition(0.3*MILE*eul(45*DEG))
+
+strega+="Repositioning kansas\n\n"
+strega += "kansas.land_position = "+str(kansas.land_position)+"\n"
+strega+="camry.shape.position = "+str(camry.shape.position)+"\n"
+strega+="toyota.shape.position = "+str(toyota.shape.position)+"\n\n"
+
+
+
+print(strega)
 
 
 
