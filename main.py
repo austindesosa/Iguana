@@ -220,10 +220,10 @@ def curve_ray(theta, kurv_r):
 
 
 def to_ray(d_path, helm):
-  #@param   d_path   is distance travelled on a path 
+  '''#@param   d_path   is distance travelled on a path 
   #@param   helm   is the helm of a car travelling that path
   #Returns phasor representing net displacement of that path,
-  #be it straight or curved
+  #be it straight or curved'''
   ang = d_path * helm
   if ang < MIN_HELM:
     return d_path * eul(0)
@@ -596,7 +596,7 @@ class Car:
     self.path = 0 + 0.0  #Total distance travelled since instantiation
     self.helm = 0 + 0.0 #Horizontal driving angle, in Radians per Meter rightward
     self.is_curved = abs(self.helm) > MIN_HELM #Boolean true if car's path is curved
-    self.delta_tau = 0.0000000001 #Short time delay for actual time delays like time.sleep()
+    self.delta_tau = 0 #Short time delay for actual time delays like time.sleep()
     self.t_poll = 0.1 #Short time delay for predicting the car‘s motion
     self.t_now = 0.0 #Amount of time car has been in motion
     self.shape = Rectangle(5,3)
@@ -612,7 +612,7 @@ class Car:
     self.brake = self.pwr_drive < 0 #Set brake flag if driver intentionally reducing energy
     self.pwr_grav = GRAV * sin(self.tilt) * self.mass * self.speed
     self.pwr_net = self.pwr_grav + self.pwr_drive + self.pwr_other
-    self.is_curved = abs(self.helm) > (0.000001 * DEG)
+    self.is_curved = abs(self.helm) > MIN_HELM
     if (self.speed <= 0) and (sgn(self.pwr_drive) < 0) :
       self.stop = 1
       self.energy = 0.0
@@ -922,7 +922,8 @@ class Land:
       else:
         curv_r = 1.0 / abs(self.helmvec[i])
         self.phasorvec.append(curve_ray(ang, curv_r))
-    self.ray = sum(self.phasorvec) #Phasor representing net displacement of path, in same units as Car.pos
+    self.ray = to_ray(self.size*self.delta_space, avg(self.helmvec)) 
+    #Phasor representing net displacement of path, in same units as Car.pos
     self.tau_max = 0 #Processor time constant
     self.t_land = 1/50 #Polling rate, in simulated seconds, for Car objects in this Land 
     #EXPERIMENTAL INSTANCE VARIABLES   
@@ -968,8 +969,7 @@ class Land:
         self.phasorvec[i] = curve_ray(ang, curv_r)
     while( len(self.phasorvec) > self.size):
       self.phasorvec.pop(-1)
-    self.ray = sum(self.phasorvec)
-    #EXPERIMENTAL CODE
+    self.ray = to_ray(self.size*self.delta_space, avg(self.helmvec))
     self.tilt_avg = avg(self.tiltvec)
     self.helm_avg = avg(self.helmvec)
     self.frix_avg = avg(self.frixvec)
@@ -979,16 +979,15 @@ class Land:
     Returns phasor representing net displacement between beginning of path
     and that point in space''' 
     ndx = self.ndx_point(space)
-    ray = 0 * eul(0)
+    d_upto = ndx * self.delta_space
+    sh = 0
     for i in range(ndx):
-      ray += self.phasorvec[i]
-    last_space = space - (ndx * self.delta_space)
-    h = self.helmvec[ndx]
-    if (h < MIN_HELM):
-      ray += last_space * eul(0)
-    else:
-      ray += curve_ray(last_space, last_space * h)
-    return ray 
+      sh += self.helmvec[i]
+    h_avg = xdiv(0, float(sh), ndx)
+    r = to_ray(d_upto, h_avg)
+    r += to_ray(space - d_upto, self.helmvec[ndx])
+    return r
+
     
   def drxn_ray(self, space):
     #@param   space   is a float
@@ -1365,6 +1364,26 @@ class Land:
       v_sizes.append(len(v_in))
     return v_in
 
+  def repos_in(self):
+    for i in range(len(self.inlandvec)):
+      inland = self.inlandvec[i]
+      z = self.land_position + self.point_ray(self.inspacevec[i])
+      z -= inland.ray 
+      if z != inland.land_position:
+        inland.reposition(z)
+    self.sweep()   
+
+  def repos_out(self):
+    for i in range(len(self.outlandvec)):
+      outland = self.outlandvec[i]
+      ndx = outland.inlandvec.index(self)
+      z = self.land_position + self.ray
+      z -= self.point_ray(outland.inspacevec[ndx])
+      if z != outland.land_position:
+        outland.reposition(z)
+    self.sweep()
+    
+
 
     
     
@@ -1482,36 +1501,25 @@ class Terrain:
 
 ### TESTING SECTION
 
-#Instantiate Car object
+#Instantiate Car objects
 camry_mass = 1000   
 camry_energy = kinetic(camry_mass, 65*MPH)
 camry_pwr = 0.3 * camry_energy
 
 camry = Car(camry_mass, 0, camry_energy)
 toyota = Car(camry_mass, 0, camry_energy)
-kansas = Uniformland(0,0,MILE)
-strega = ""
+upstream = Uniformland(0, 1.5*DEG, 30)
+downstream = Uniformland(0, 0, MILE)
+#upstream.recompass(eul(-45*DEG))
+upstream.outflow(downstream)
 
-kansas.enter_car(camry,0)
-kansas.enter_car(toyota, 10)
-t_1 = 0 + time.time()
-kansas.repitar(1)
-t_2 = 0 + time.time()  
-dt = t_2 - t_1
-strega += "time elapsed for Land.repitar:  "+str(dt)+"  seconds\n\n"
+strega = "upstream.land_position = "+str(upstream.land_position)+"\n"
+strega += "downstream.land_position = "+str(downstream.land_position)+"\n\n"
+downstream.repos_in()  
+strega += "upstream.repos_in() invoked \n\n" 
+strega += "upstream.land_position = "+str(upstream.land_position)+"\n"
+strega += "downstream.land_position = "+str(downstream.land_position)+"\n\n"
 
-
-strega += "kansas.land_position = "+str(kansas.land_position)+"\n"
-strega+="camry.shape.position = "+str(camry.shape.position)+"\n"
-strega+="toyota.shape.position = "+str(toyota.shape.position)+"\n\n"
-#print(strega)
-
-kansas.reposition(0.3*MILE*eul(45*DEG))
-
-strega+="Repositioning kansas\n\n"
-strega += "kansas.land_position = "+str(kansas.land_position)+"\n"
-strega+="camry.shape.position = "+str(camry.shape.position)+"\n"
-strega+="toyota.shape.position = "+str(toyota.shape.position)+"\n\n"
 
 
 
