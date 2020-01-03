@@ -657,6 +657,16 @@ class Car:
     NOTE : <kin_eneergy> is a dummy parameter, 
     this function actually does all calculations using instance variables'''
     return self.friction(self.frix_coeff)
+
+  def respeed(self, new_speed):
+    '''<New speed> of Car in SI units   
+    Changes the speed of the Car to <new_speed> 
+    and adjusts instance variables to match.
+    WARNING: Does not simulate any motion,
+    just changes the speed'''
+    self.energy = kinetic(self.mass, new_speed)
+    self.sweep()
+
     
   def other_fxn(self):
     #Returns default Funxion object  
@@ -844,6 +854,7 @@ class Car:
     car.pos, car.delta_pos = self.pos, self.delta_pos
     car.is_curved, car.delta_tau = self.is_curved, self.delta_tau
     car.t_poll, car.t_now = self.t_poll, self.t_now
+    car.frix_coeff, car.shape = car.frix_coeff, car.shape.copy()
     return car
 
   def copy_name(self, new_name):
@@ -883,6 +894,7 @@ class Car:
     strega += "self.delta_tau = "+str(self.delta_tau)+"  seconds\n"
     strega += "self.t_poll = "+str(self.t_poll)+  "  seconds\n"
     strega += "self.t_now = "+str(self.t_now)+"  seconds\n"
+    strega += "self.shape = "+str(self.shape)+"  Obstacle object\n"
     strega += "END Car   "+self.name+"   attributes\n\n\n"
     return strega
 
@@ -973,6 +985,9 @@ class Land:
     self.tilt_avg = avg(self.tiltvec)
     self.helm_avg = avg(self.helmvec)
     self.frix_avg = avg(self.frixvec)
+    #EXPERIMENTAL CODE
+    self.has_in = len(self.inlandvec) > 0
+    self.has_out = len(self.outlandvec) > 0
 
   def point_ray(self, space):
     '''<Distance travelled> along path represnted by theis Land object
@@ -1226,11 +1241,9 @@ class Land:
     
   def inflow(self, land, space):
     '''#@param   land   is Land object representing
-    #   one of the forks at the end of theroad
+    #   one of the roads flowing into the road
     #   represented by this Land object.
-    #@param   space   is point, in Car.path units,
-    #   at which <land> flows into this Land
-    #Makes this Land object recognize recognize
+    #Makes this Land object recognize 
     #<land> as one of the roads joining into this one'''
     self.has_in, self.has_out = 1,1
     drxn_in=land.drxn_ray(land.endspace())
@@ -1368,7 +1381,7 @@ class Land:
     for i in range(len(self.inlandvec)):
       inland = self.inlandvec[i]
       z = self.land_position + self.point_ray(self.inspacevec[i])
-      z -= inland.ray 
+      z -= inland.ray * inland.compass
       if z != inland.land_position:
         inland.reposition(z)
     self.sweep()   
@@ -1378,10 +1391,29 @@ class Land:
       outland = self.outlandvec[i]
       ndx = outland.inlandvec.index(self)
       z = self.land_position + self.ray
-      z -= self.point_ray(outland.inspacevec[ndx])
+      z -= self.point_ray(outland.inspacevec[ndx])*outland.compass
       if z != outland.land_position:
         outland.reposition(z)
     self.sweep()
+
+  def repos_downstream(self):
+    '''Like Land.repos_out except it does All downsrteam connections,
+    not just immediate connections'''
+    v = self.connectvec_out()
+    for i in range(len(v)):
+      v[i].repos_out()
+    self.sweep() 
+
+  def repos_upstream(self):
+    '''Like Land.repos_downstream except it deals with inflows'''
+    v = self.connectvec_in() 
+    for i in range(len(v)):
+      v[i].repos_in()  
+    self.sweep()   
+
+  def repos_all(self):
+    self.repos_upstream()    
+    self.repos_downstream()
     
 
 
@@ -1403,7 +1435,7 @@ class Land:
 
   
   def tostring(self):
-    strega = "Land   "+self.name+"   has these instance variables \n"
+    strega = "Land   "+self.name+"   has these instance variables: \n"
     strega += "self.delta_space = "+str(self.delta_space)+"\n"
     strega += "self.tilt_avg = "+str(self.tilt_avg)+"\n"
     strega += "self.tiltvec = "+str(self.tiltvec)+"\n"
@@ -1488,7 +1520,7 @@ class Terrain:
     and their connections in this Terrain object'''
     self.land_center = land_center
     self.direction = self.land_center.compass
-    self.place_center = 0*eul(0)
+    self.place_center = self.land_center.land_position
     self.landvec = self.land_center.connectvec()
     self.tau_center = self.land_center.tau_max #processor time constant
     self.t_terrain = self.land_center.t_land #simulation time constant
@@ -1498,6 +1530,40 @@ class Terrain:
       land.t_land = self.t_terrain
       land.conform(self.land_center.delta_space)
       land.sweep()
+    self.land_center.repos_all()
+    self.landplacevec = []
+    for i in range(len(self.landvec)):
+      self.landplacevec.append(self.landvec[i].land_position)
+
+    
+  def sweep(self):
+    self.direction = self.land_center.compass
+    self.place_center = self.land_center.land_position
+    self.landvec = self.land_center.connectvec()   
+    self.land_center.repos_all()   
+    while(len(self.landvec) > len(self.landplacevec)):
+      self.landplacevec.append(0) #to avoid crashing
+    for i in range(len(self.landvec)):
+      land = self.landvec[i]
+      self.landplacevec[i] = land.land_position
+      if land.delta_space != self.land_center.delta_space:
+        land.conform(self.land_center.delta_space)
+      land.t_land = self.t_terrain
+      land.tau_max = self.tau_center
+      land.sweep
+
+    
+  def rotate(self, ang):
+    '''<Angle>
+    Rotates every Land object in this Terrain by
+    <ang> degrees rightward'''
+    redrxn = eul(ang)
+    for land in self.landvec:
+      new_compass = land.compass * redrxn
+      land.recompass(new_compass)
+    self.sweep()   
+
+
 
 ### TESTING SECTION
 
@@ -1508,24 +1574,30 @@ camry_pwr = 0.3 * camry_energy
 
 camry = Car(camry_mass, 0, camry_energy)
 toyota = Car(camry_mass, 0, camry_energy)
-upstream = Uniformland(0, 1.5*DEG, 30)
-downstream = Uniformland(0, 0, MILE)
-#upstream.recompass(eul(-45*DEG))
-upstream.outflow(downstream)
 
-strega = "upstream.land_position = "+str(upstream.land_position)+"\n"
-strega += "downstream.land_position = "+str(downstream.land_position)+"\n\n"
-downstream.repos_in()  
-strega += "upstream.repos_in() invoked \n\n" 
-strega += "upstream.land_position = "+str(upstream.land_position)+"\n"
-strega += "downstream.land_position = "+str(downstream.land_position)+"\n\n"
+zerovec = podvec(0,7)
+milevec = podvec(MILE,7)
+inroads = funxvec_3(Uniformland, zerovec, zerovec, milevec)
+inroads.reverse()
+outroads = funxvec_3(Uniformland, zerovec, podvec(.02*DEG, 7), milevec)
+center = Uniformland(0,0, MILE)     
+for i in range(7):
+  ang = i * PI / 14
+  outroads[i].recompass(eul(ang))
+  inroads[i].recompass(eul(-1*ang))
+for i in range(6):
+  inroads[i].inflow(inroads[i+1], 0)
+  outroads[i].outflow(outroads[i+1])
+center.outflow(outroads[0])
+center.inflow(inroads[0],0)
 
-
-
-
+ter = Terrain(center)
+strega = "ter.landvec = "+str(ter.landvec)+"\n"
+strega += "ter.landplacevec = "+str(ter.landplacevec)+"\n\n\n"
+ter.rotate(31*DEG)
+strega+="ter has been rotated 31 degrees rightwards...\n\n"
+strega +="ter.landplacevec = "+str(ter.landplacevec)+"\n\n"
 print(strega)
-
-
 
 
 
