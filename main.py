@@ -666,7 +666,7 @@ class Car:
     using the simple model taught in beginner-level physics'''
     weight = GRAV * self.mass 
     weight *= cos( self.tilt )
-    return -1 * abs(weight * self.speed  )
+    return -1 * abs(m_k * weight * self.speed  )
 
   def frict_encaps(self, kin_energy):
     '''<Kinetic Energy> in SI units   
@@ -955,7 +955,7 @@ class Land:
     self.ray = to_ray(self.size*self.delta_space, avg(self.helmvec)) 
     #Phasor representing net displacement of path, in same units as Car.pos
     self.tau_max = 0 #Processor time constant
-    self.t_land = 1/50 #Polling rate, in simulated seconds, for Car objects in this Land 
+    self.t_land = 1/100 #Polling rate, in simulated seconds, for Car objects in this Land 
     #EXPERIMENTAL INSTANCE VARIABLES   
     self.outlandvec=[]
     self.outangvec=[]
@@ -1683,14 +1683,35 @@ class Driver:
     '''Driver.pwr_equilibrium encapsulated in Funxion object'''
     def dummy(t):
       return self.pwr_equilibrium()
-    return Funxion(dummy, self.car.t_now)  
+    return Funxion(dummy, self.car.t_now)
+
+  def slow_fxn(self, speed, dur_accel):
+    delta_kin = kinetic(self.car.mass, speed) - self.car.energy
+    watt_xtra = float(delta_kin) / dur_accel
+    def dummy(t):
+      ret = 0
+      if self.car.speed > speed:
+        ret = watt_xtra
+      return ret
+    return Funxion(dummy, self.terrain.t_terrain)
+
+  def fast_fxn(self, speed, dur_accel):
+    delta_kin = kinetic(self.car.mass, speed) - self.car.energy
+    watt_xtra = float(delta_kin) / dur_accel
+    def dummy(t):
+      ret = 0
+      if self.car.speed < speed:
+        ret = watt_xtra
+      return ret
+    return Funxion(dummy, self.terrain.t_life)
+
 
   def tospeed_fxn(self, speed, dur_accel):
-    #WARNING: Acts weird
-    delta_kin = kinetic(speed, self.car.mass) - self.car.energy
-    watt_xtra = float(delta_kin) / dur_accel
-    xtra_fxn = Pulse(self.terrain.t_life , self.terrain.t_life + dur_accel).scale(watt_xtra)
-    return SumFunxion([xtra_fxn, self.steady_fxn()] , self.terrain.t_life)
+    #WARNING: Acts weird--doesn't stop at desired speed
+    if speed < self.car.speed:
+      return SumFunxion( [self.slow_fxn(speed, dur_accel), self.steady_fxn()], self.terrain.t_life)
+    else:
+      return SumFunxion([self.fast_fxn(speed, dur_accel), self.steady_fxn()] , self.terrain.t_life)
 
 
   def choose_next(self, downland):
@@ -1766,8 +1787,9 @@ camry.respeed(0)
 adam = Driver(camry, ter)
 adam.choose_straight()
 
-adam.drive_funxion = adam.tospeed_fxn(55*MPH, 10)
-adam.adjust_pwr()    
-adam.terrain.rep(10)
+adam.drive_funxion = adam.tospeed_fxn(5, 1)
+for i in range(50):
+  adam.adjust_pwr()
+  adam.terrain.rep(0.1)
 print(adam.car.str_motion())
 
