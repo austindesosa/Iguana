@@ -55,7 +55,7 @@ def prod(v):
   return p
 
 def xmult(lhop, x1, x2):
-  '''《lHospial limit》, 《scalar》, 《other scalar》
+  '''《lHospital limit》, 《scalar》, 《other scalar》
   lhop is winner of l'Hospital's
   rule
   Multiplies the two POSSIBLY INFINITE scalars 《x1》 and 《x2》 in accordance with whatever lHospital's rule
@@ -1245,7 +1245,7 @@ class Land:
     #   represented by this Land object.
     #Makes this Land object recognize 
     #<land> as one of the roads joining into this one'''
-    self.has_in, self.has_out = 1,1
+    self.has_in, land.has_out = 1,1
     drxn_in=land.drxn_ray(land.endspace())
     drxn_me = self.drxn_ray(space)
     ang = angle(drxn_me / drxn_in) 
@@ -1563,6 +1563,148 @@ class Terrain:
       land.recompass(new_compass)
     self.sweep()   
 
+  def landsearch(self, car):
+    ret = 0
+    for land in self.landvec:
+      if car in land.carvec:
+        ret = land
+    return ret
+
+  def changeland(self, car, land):
+    land_init = self.landsearch(car)
+    space_over = land_init.carspacevec[land_init.carvec.index(car)] - land_init.endspace()
+    if car.rev:
+      space_over = land.endspace + land_init.carspacevec[land_init.carvec.index(car)]
+    land_init.exit_car(car)
+    land.enter_car(car, space_over)
+    self.sweep()
+
+  def rep(self, dur_t):
+    for land in self.landvec:
+      land.repitar(dur_t)
+    self.sweep()
+
+  def is_route(self, land_array):
+    ret = 1
+    for i in range(len(land_array) - 1):
+      la_now, la_next = land_array[i], land_array[i+1]
+      b=1
+      b *= la_next in la_now.outlandvec 
+      b += la_next in la_now.inlandvec
+      ret *= b 
+    return ret
+
+  def outroute(self, land_contact, land_array):
+    land_contact.append(land_array[0])
+    for i in range(len(land_array) - 1):
+      land_array[i].outflow(land_array[i+1])
+    self.sweep()  
+
+  def inroute(self, land_contact, land_array, inpoint_array):
+    land_arr, in_arr = copy(land_array), copy(inpoint_array)
+    land_arr.reverse()
+    in_arr.reverse()   
+    land_contact.inflow(land_arr[0], in_arr[0])
+    for i in range(len(land_arr) - 1):
+      land_arr[i].inflow(land_arr[i+1, in_arr[i+1]])
+    self.sweep()   
+
+  def outpll(self, land_contact, land_array):
+    for la in land_array:
+      land_contact.outflow(la)
+    self.sweep()    
+
+  def inpll(self, land_contact, land_array, inpoint):
+    for la in land_array:
+      land_contact.inflow(la, inpoint)
+    self.sweep()    
+
+
+
+      
+
+
+### DRIVER CLASS 
+class Driver:
+
+  def __init__(self, car, terrain):
+    '''<Car object>, <Terrain object>
+    '''
+    self.car = car
+    self.terrain = terrain
+    self.land = self.terrain.landsearch(self.car)
+    self.pwr_out = self.car.pwr_drive 
+    #self.xfer_funxion = Funxion(unity, self.pwr_out)
+    #self.pwr_in = self.xfer_funxion.out_val
+    self.t_num = 10 #integer to be used as multiplying factor for time constants
+    self.next_land = terrain.land_center 
+    self.drive_funxion = self.car.drive_fxn()
+    self.other_funxion = self.car.other_fxn()
+    self.ndx_car = self.land.carvec.index(self.car)
+
+  def sweep(self):
+    self.land = self.terrain.landsearch(self.car)
+    self.car.pwr_drive = self.pwr_out
+    self.ndx_car = self.land.carvec.index(self.car)
+
+
+
+  def pwr_equilibrium(self):
+    '''Returns mechanical power necessary to counteract both gravity and friction'''
+    return -1*(self.car.pwr_grav + self.car.pwr_other)
+
+  def steady_fxn(self):
+    '''Driver.pwr_equilibrium encapsulated in Funxion object'''
+    def dummy(t):
+      return self.pwr_equilibrium()
+    return Funxion(dummy, self.car.t_now)  
+
+  def tospeed_fxn(self, speed, dur_accel):
+    delta_kin = kinetic(speed, self.car.mass) - self.car.energy
+    watt_xtra = float(delta_kin) / dur_accel
+    xtra_fxn = Pulse(self.terrain.t_life , self.terrain.t_life + dur_accel).scale(watt_xtra)
+    return SumFunxion([xtra_fxn, self.steady_fxn] , self.terrain.t_life)
+
+
+  def choose_next(self, downland):
+    self.next_land = downland
+
+  def choose_straight(self):
+    v=[]
+    lav = []
+    if self.car.rev:
+      v = funxvec(abs, self.land.inangvec)
+      lav = self.land.inlandvec
+    else:
+      v = funxvec(abs, self.land.outangvec)
+      lav = self.land.outlandvec
+    ndx_ang = v.index(min(v))
+    self.choose_next[ndx_ang]
+
+  def adjust_pwr(self):
+    self.other_funxion.feed(self.car.energy)
+    self.car.pwr_other = self.other_funxion.out_val
+    self.drive_funxion.feed(self.terrain.t_life)
+    self.pwr_out = self.drive_funxion.out_val 
+
+  def rep_driver_raw(self, dur_t):
+    self.adjust_pwr()
+    self.terrain.rep(dur_t)
+    space = self.car.carspacevec[self.ndx_car]
+    if (space < 0) or (space > self.land.endspace()):
+      self.land.changeland(self.car, self.next_land)
+
+  def rep_driver(self, dur_t):
+    thr = threading.Thread(target = self.rep_driver_raw, name="", args=(dur_t))
+    thr.start()   
+
+  def rep_short(self):
+    self.rep_driver(self.t_num * self.terrain.t_terrain)
+
+
+  
+
+    
 
 
 ### TESTING SECTION
