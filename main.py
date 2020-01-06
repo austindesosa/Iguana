@@ -526,6 +526,24 @@ class Obstacle:
     Rotates orientation of this Obstacle by <ang> radians'''
     self.orientation *= eul(ang)
 
+  def within(self, p):
+    '''<Position phasor>
+    Retuns boolean indicating whether <p>
+    is within borders of this Obstacle'''
+    r = p - self.position
+    r_adj = r / self.orientation
+    ang = angle(r_adj)
+    return (self.ray_length(ang) >= abs(r))
+
+  def borderpt(self, ang):
+    '''<Angle>
+    Returns position phasor representing position phasor of point 
+    on this Obstacle's border, <ang> radians rightward from self.orientatiin'''
+    pt = 0
+    pt += self.position
+    pt += self.ray_length(ang) * eul(ang)
+    return pt
+
   def copy(self):
     '''Returns copy of this Obstacle objects'''
     obst = Obstacle(self.funxion, self.position)
@@ -1518,6 +1536,7 @@ class Terrain:
     '''<Land object> 
     <land_center> is Land object which will be used as a reference for all Land objects 
     and their connections in this Terrain object'''
+    self.name = "terrain"
     self.land_center = land_center
     self.direction = self.land_center.compass
     self.place_center = self.land_center.land_position
@@ -1564,11 +1583,17 @@ class Terrain:
     self.sweep()   
 
   def landsearch(self, car):
-    ret = 0
+    ret = self.land_center
     for land in self.landvec:
       if car in land.carvec:
         ret = land
     return ret
+
+  def has_car(self, car):
+    '''<Car object>
+    Returns boolean telling whether <car> is in this Terrain object'''
+    la = self.landsearch(car)   
+    return (car in la.carvec)
 
   def changeland(self, car, land):
     land_init = self.landsearch(car)
@@ -1630,6 +1655,7 @@ class Driver:
   def __init__(self, car, terrain):
     '''<Car object>, <Terrain object>
     '''
+    self.name = "driver"
     self.car = car
     self.terrain = terrain
     self.land = self.terrain.landsearch(self.car)
@@ -1679,13 +1705,14 @@ class Driver:
       v = funxvec(abs, self.land.outangvec)
       lav = self.land.outlandvec
     ndx_ang = v.index(min(v))
-    self.choose_next[ndx_ang]
+    self.choose_next( lav[ndx_ang])
 
   def adjust_pwr(self):
     self.other_funxion.feed(self.car.energy)
     self.car.pwr_other = self.other_funxion.out_val
     self.drive_funxion.feed(self.terrain.t_life)
-    self.pwr_out = self.drive_funxion.out_val 
+    self.pwr_out = self.drive_funxion.out_val
+    self.car.pwr_drive = self.pwr_out 
 
   def rep_driver_raw(self, dur_t):
     self.adjust_pwr()
@@ -1701,6 +1728,12 @@ class Driver:
   def rep_short(self):
     self.rep_driver(self.t_num * self.terrain.t_terrain)
 
+  def rep_long(self, dur_sim):
+    t_unit = self.t_num * self.terrain.t_terrain
+    n = int(dur_sim // t_unit)
+    for i in range(n):
+      self.rep_short()
+
 
   
 
@@ -1709,41 +1742,23 @@ class Driver:
 
 ### TESTING SECTION
 
-#Instantiate Car objects
-camry_mass = 1000   
-camry_energy = kinetic(camry_mass, 65*MPH)
-camry_pwr = 0.3 * camry_energy
+#Instantiate 2 Car objects
+camry, toyota = Car(1000,0,0), Car(1500,0,0)
 
-camry = Car(camry_mass, 0, camry_energy)
-toyota = Car(camry_mass, 0, camry_energy)
+#Istantiate 7 Land objects
+seven_lands = funxvec_3(Uniformland, podvec(0,7), podvec(0,7) , podvec(MILE/5, 7) )
+kansas = seven_lands[0]
+kans_nw, kans_front, kans_ne = seven_lands[1], seven_lands[2], seven_lands[3]
+kans_nw.recompass(eul(-1*PI/4)) 
+kans_ne.recompass(eul(PI/4))
+kans_sw, kans_back, kans_se = seven_lands[4], seven_lands[5], seven_lands[6]
+kans_sw.recompass(eul(PI/4))
+kans_se.recompass(eul(-1*PI/4))
 
-zerovec = podvec(0,7)
-milevec = podvec(MILE,7)
-inroads = funxvec_3(Uniformland, zerovec, zerovec, milevec)
-inroads.reverse()
-outroads = funxvec_3(Uniformland, zerovec, podvec(.02*DEG, 7), milevec)
-center = Uniformland(0,0, MILE)     
-for i in range(7):
-  ang = i * PI / 14
-  outroads[i].recompass(eul(ang))
-  inroads[i].recompass(eul(-1*ang))
-for i in range(6):
-  inroads[i].inflow(inroads[i+1], 0)
-  outroads[i].outflow(outroads[i+1])
-center.outflow(outroads[0])
-center.inflow(inroads[0],0)
-
-ter = Terrain(center)
-strega = "ter.landvec = "+str(ter.landvec)+"\n"
-strega += "ter.landplacevec = "+str(ter.landplacevec)+"\n\n\n"
-ter.rotate(31*DEG)
-strega+="ter has been rotated 31 degrees rightwards...\n\n"
-strega +="ter.landplacevec = "+str(ter.landplacevec)+"\n\n"
-print(strega)
+#Instantiate Terrain object, link Lands together
+ter = Terrain(kansas)
+ter.outpll(kansas, [kans_ne, kans_front, kans_nw])
+ter.inpll(kansas, [kans_se, kans_back, kans_sw], 0)
 
 
-
-
-
-
-
+print(str(ter.landvec))
