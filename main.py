@@ -419,7 +419,7 @@ def SumFunxion(funxionvec, in_val):
       funxion.feed( x )
       yvec.append(funxion.out_val)
     return sum(yvec)
-  fu = Funxion(dummy, 0)
+  fu = Funxion(dummy, in_val)
   return fu
 
 def Linear(slope, y_i):
@@ -1686,10 +1686,11 @@ class Driver:
     return Funxion(dummy, self.car.t_now)  
 
   def tospeed_fxn(self, speed, dur_accel):
+    #WARNING: Acts weird
     delta_kin = kinetic(speed, self.car.mass) - self.car.energy
     watt_xtra = float(delta_kin) / dur_accel
     xtra_fxn = Pulse(self.terrain.t_life , self.terrain.t_life + dur_accel).scale(watt_xtra)
-    return SumFunxion([xtra_fxn, self.steady_fxn] , self.terrain.t_life)
+    return SumFunxion([xtra_fxn, self.steady_fxn()] , self.terrain.t_life)
 
 
   def choose_next(self, downland):
@@ -1760,5 +1761,13 @@ ter = Terrain(kansas)
 ter.outpll(kansas, [kans_ne, kans_front, kans_nw])
 ter.inpll(kansas, [kans_se, kans_back, kans_sw], 0)
 
+kansas.enter_car(camry,0)
+camry.respeed(0)
+adam = Driver(camry, ter)
+adam.choose_straight()
 
-print(str(ter.landvec))
+adam.drive_funxion = adam.tospeed_fxn(55*MPH, 10)
+adam.adjust_pwr()    
+adam.terrain.rep(10)
+print(adam.car.str_motion())
+
