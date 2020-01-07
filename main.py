@@ -1143,8 +1143,7 @@ class Land:
     self.carvec.append(car)
     self.carspacevec.append(space )
     #EXPERIMENTAL CODE   
-    self.drivevec.append(car.drive_fxn())
-    self.othervec.append(car.other_fxn())
+    car.pos = self.land_position + (self.point_ray(space)*self.compass)
     self.sweep()
 
     
@@ -1152,11 +1151,11 @@ class Land:
     '''<Car object>
     Removes that Car from this Land object if it's in here'''
     if car in self.carvec:
-      ndx = self.carvec.ndx( car  )
+      ndx = self.carvec.index( car  )
       self.carvec.pop(ndx)
-      self.carspacvec.pop(ndx)
-      self.drivevec.pop(ndx)
-      self.othervec.pop(ndx)
+      self.carspacevec.pop(ndx)
+      #self.drivevec.pop(ndx)
+      #self.othervec.pop(ndx)
     self.sweep()
 
   
@@ -1252,7 +1251,7 @@ class Land:
     '''<Number> of seconds of simulated time
     Repeats the method self.ir_todos for
     <dur_t> simulated seconds'''
-    n = int(dur_t // self.t_land)
+    n = 1 + int(dur_t // self.t_land)
     for i in range(n):
       self.ir_todos()   
     self.sweep()
@@ -1669,8 +1668,17 @@ class Driver:
     self.ndx_car = self.land.carvec.index(self.car)
 
   def sweep(self):
-    self.land = self.terrain.landsearch(self.car)
+    #self.land = self.terrain.landsearch(self.car)
     self.car.pwr_drive = self.pwr_out
+    space = self.land.carspacevec[self.ndx_car]
+    if self.car.rev and (space < 0):
+      if self.next_land != self.land:
+        self.terrain.changeland(self.car, self.next_land)
+    elif (not self.car.rev) and (space > self.land.endspace()):
+      if  self.next_land != self.land:
+        self.terrain.changeland(self.car, self.next_land)
+    self.terrain.sweep
+    self.land = self.terrain.landsearch(self.car)
     self.ndx_car = self.land.carvec.index(self.car)
 
 
@@ -1707,7 +1715,6 @@ class Driver:
 
 
   def tospeed_fxn(self, speed, dur_accel):
-    #WARNING: Acts weird--doesn't stop at desired speed
     if speed < self.car.speed:
       return SumFunxion( [self.slow_fxn(speed, dur_accel), self.steady_fxn()], self.terrain.t_life)
     else:
@@ -1734,18 +1741,13 @@ class Driver:
     self.car.pwr_other = self.other_funxion.out_val
     self.drive_funxion.feed(self.terrain.t_life)
     self.pwr_out = self.drive_funxion.out_val
-    self.car.pwr_drive = self.pwr_out 
-
-  def rep_driver_raw(self, dur_t):
-    self.adjust_pwr()
-    self.terrain.rep(dur_t)
-    space = self.car.carspacevec[self.ndx_car]
-    if (space < 0) or (space > self.land.endspace()):
-      self.land.changeland(self.car, self.next_land)
+    self.car.pwr_drive = self.pwr_out
+    self.sweep()
 
   def rep_driver(self, dur_t):
-    thr = threading.Thread(target = self.rep_driver_raw, name="", args=(dur_t))
-    thr.start()   
+    self.adjust_pwr()    
+    self.terrain.rep(dur_t)
+    self.sweep()      
 
   def rep_short(self):
     self.rep_driver(self.t_num * self.terrain.t_terrain)
@@ -1782,14 +1784,15 @@ ter = Terrain(kansas)
 ter.outpll(kansas, [kans_ne, kans_front, kans_nw])
 ter.inpll(kansas, [kans_se, kans_back, kans_sw], 0)
 
-kansas.enter_car(camry,0)
+kansas.enter_car(camry,300)
 camry.respeed(0)
 adam = Driver(camry, ter)
 adam.choose_straight()
 
 adam.drive_funxion = adam.tospeed_fxn(5, 1)
-for i in range(50):
-  adam.adjust_pwr()
-  adam.terrain.rep(0.1)
+adam.rep_long(10.7)
 print(adam.car.str_motion())
+
+print("\nadam.terrain.land_center = "+str(adam.terrain.land_center))
+print("\nadam.land = "+str(adam.land))
 
