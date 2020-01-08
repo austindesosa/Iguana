@@ -28,6 +28,7 @@ MPH = float(MILE) / HOUR
 GRAV = 9.81 # acceleration due to gravity at Earth's surface in SI units
 
 ### BASIC MATH FUNCTIONS
+
 sin,cos,tan = math.sin, math.cos, math.tan
 arcsin, arccos, arctan = math.asin, math.acos, math.atan
 ln, exp = math.log, math.exp
@@ -203,6 +204,33 @@ def copy(vec ):
   for i in range(len(vec)):
     v.append(vec[i])
   return v
+  
+def closest(x, vec):
+  '''<Number>, <List>
+  Returns value in <vec> closest to <x>'''
+  vm=[]
+  for i in range(len(vec)):
+    vm.append(abs(x-vec[i]))
+  ndx = vm.index(min(vm))
+  return vec[ndx]
+
+def num_in_list(x, vec):
+  '''<Value>, <List>
+  Returns number of times <x> appears in <vec>'''
+  s=0
+  for a in vec:
+    s+=int(a==x)   
+  return s
+
+def val_index_vec(x, vec):
+  '''<Value>, <List>
+  Returns list with indices where <x> appears in <vec>'''
+  ret=[]
+  for i in range(len(vec)):
+    if vec[i]==x:
+      ret.append(i)   
+  return ret
+  
 
 ### MATH FUNCTIONS FOR THIS PROGRAM
 
@@ -964,6 +992,9 @@ class Land:
     self.inspacevec=[]
     self.has_in = 0 #boolean, only true if other Land objects frow into this one
     self.has_out = 0 #boolean, only true if this Land object flows into others
+
+  def rename(self, name):
+    self.name = name
     
     
   def ndx_point(self, path):
@@ -1514,6 +1545,11 @@ def Uniformland(tilt, helm, mileage):
   for <mileage> meters'''
   return Funxionland(Konstant(tilt), Konstant(helm), mileage)
 
+def Blankland():
+  '''Returns Land object representing 
+  one mile of straight, flat, frictionless road'''
+  return Uniformland(0,0,MILE)
+
 def Straighthill(tiltvec):
   '''<List of tilt values>
   Returns Land object representing a perfectly straight road
@@ -1681,6 +1717,18 @@ class Driver:
     self.land = self.terrain.landsearch(self.car)
     self.ndx_car = self.land.carvec.index(self.car)
 
+  def reverse(self):
+    '''Encapsulation of Car.reverse for this Driver object'''
+    self.car.reverse()    
+
+  def forward(self):
+    '''Encapsulation of Car.forward for this Driver object'''
+    self.car.forward()
+
+  def position(self):
+    '''Returns position phasor returning centerpointof this Driver object's Car'''
+    return self.car.shape.position
+
 
 
   def pwr_equilibrium(self):
@@ -1724,24 +1772,46 @@ class Driver:
   def choose_next(self, downland):
     self.next_land = downland
 
-  def choose_straight(self):
-    v=[]
-    lav = []
+  def choose_ang(self, ang):
+    thv = self.land.outangvec
+    lav = self.land.outlandvec
     if self.car.rev:
-      v = funxvec(abs, self.land.inangvec)
-      lav = self.land.inlandvec
+      lav = self.inlandvec
+      thv = kvec(-1, self.land.inangvec)
+      #angles multiplied by negative 1
+      #because of sign convention about crossing
+    if len(lav) < 1:
+      self.choose_next(self)
     else:
-      v = funxvec(abs, self.land.outangvec)
-      lav = self.land.outlandvec
-    ndx_ang = v.index(min(v))
-    self.choose_next( lav[ndx_ang])
+      th_close = closest(ang, thv)
+      ndx_land = thv.index(th_close)
+      #ndx_v = val_index_vec(th_close, thv)
+      if num_in_list(th_close, thv) > 1:
+        ndx_v = val_index_vec(th_close, thv)
+        helmv = []
+        for ndx in ndx_v:
+          helmv.append(lav[ndx].helmvec[0])
+        th_close = closest(ang, helmv)
+        ndx_land = helmv.index(th_close)
+      l_next = lav[ndx_land]
+      self.choose_next(l_next)
+
+
+  def choose_straight(self):
+    self.choose_ang(0)
+
+  def choose_left(self):
+    self.choose_ang(-1*PI/2)
+
+  def choose_right(self):
+    self.choose_ang(PI/2)
 
   def adjust_pwr(self):
-    self.other_funxion.feed(self.car.energy)
-    self.car.pwr_other = self.other_funxion.out_val
-    self.drive_funxion.feed(self.terrain.t_life)
-    self.pwr_out = self.drive_funxion.out_val
-    self.car.pwr_drive = self.pwr_out
+    #self.other_funxion(self.car.energy)
+    self.car.pwr_other = self.other_funxion.funx(self.car.energy)
+    #self.drive_funx(self.terrain.t_life)
+    self.pwr_out = self.drive_funxion.funx(self.terrain.t_life)
+    #self.car.pwr_drive = self.pwr_out
     self.sweep()
 
   def rep_driver(self, dur_t):
@@ -1759,6 +1829,30 @@ class Driver:
       self.rep_short()
 
 
+### DRIVER - RETURNING FUNCTIONS
+
+def Terraindriver(terra):
+  '''<Terrain object>
+  Returns default Driver object
+  made to drive in that Terrain'''
+  car = Car(1000, 0, 0)
+  terra.land_center.enter_car(car, 0)
+  terra.sweep()
+  dr = Driver(car, terra)
+  return dr
+
+def Cardriver(car):
+  '''<Car object>
+  Returns default Driver object
+  meant to drive that Car'''
+  lactr = Blankland()
+  lactr.land_position = car.shape.position
+  lactr.enter_car(car, 0) 
+  terra = Terrain(lactr)
+  terra.sweep()   
+  return Driver(car, terra)
+
+
   
 
     
@@ -1766,33 +1860,69 @@ class Driver:
 
 ### TESTING SECTION
 
+print("Iguana module running\n\n")
+
 #Instantiate 2 Car objects
 camry, toyota = Car(1000,0,0), Car(1500,0,0)
 
-#Istantiate 7 Land objects
-seven_lands = funxvec_3(Uniformland, podvec(0,7), podvec(0,7) , podvec(MILE/5, 7) )
-kansas = seven_lands[0]
-kans_nw, kans_front, kans_ne = seven_lands[1], seven_lands[2], seven_lands[3]
-kans_nw.recompass(eul(-1*PI/4)) 
-kans_ne.recompass(eul(PI/4))
-kans_sw, kans_back, kans_se = seven_lands[4], seven_lands[5], seven_lands[6]
-kans_sw.recompass(eul(PI/4))
-kans_se.recompass(eul(-1*PI/4))
+#Instantiate 4 Land objects
+ctr = Blankland()
+ctr .rename("ctr") 
+land_pll = []
+for i in range(3):
+  land_pll.append(Blankland() )
 
-#Instantiate Terrain object, link Lands together
-ter = Terrain(kansas)
-ter.outpll(kansas, [kans_ne, kans_front, kans_nw])
-ter.inpll(kansas, [kans_se, kans_back, kans_sw], 0)
+land_pll[0].rename("left_fork")
+land_pll[0].constant_helm(-1*9*DEG)
 
-kansas.enter_car(camry,300)
-camry.respeed(0)
+land_pll[1].rename("right_fork")
+land_pll[1].constant_helm(8*DEG)
+
+land_pll[2].rename("straight_fork")
+
+#Instantiate Terrain
+ter = Terrain(ctr )
+ter.outpll(ctr, land_pll)
+ter.land_center.enter_car(camry, ter.land_center.endspace() - 2.7)
+
+#Instantiate Driver
 adam = Driver(camry, ter)
+adam.car.respeed(55*MPH)
+
+#Start string for the console
+strega = "BEGINNING CONDITIONS:\n"
+strega += "adam.land = "+adam.land.name+"\n"
+strega += "adam.car.shape.position = "+str(adam.car.shape.position)+"\n\n"
+
+print(strega)
+strega = ""
+
+#Test the method
 adam.choose_straight()
+print("adam.choose_straight() invoked\n\n")
+for i in range(8):
+  print("\nLand = "+adam.land.name)
+  print("\nPosition = "+str(adam.car.pos)+"\n\n")
+  adam.rep_long(1)
 
-adam.drive_funxion = adam.tospeed_fxn(5, 1)
-adam.rep_long(10.7)
-print(adam.car.str_motion())
+#print(strega)
+strega = ""
 
-print("\nadam.terrain.land_center = "+str(adam.terrain.land_center))
-print("\nadam.land = "+str(adam.land))
+#Put results in console string
+strega += "ENDING CONDITIONS\n"
+strega += "adam.land = "+adam.land.name+"\n"
+strega += "adam.car.shape.position = "+str(adam.car.shape.position)+"\n\n"
+strega += "END EXPERIMENT\n\n\n"
+
+#Print console string
+print(strega)
+
+
+
+
+
+
+
+
+  
 
