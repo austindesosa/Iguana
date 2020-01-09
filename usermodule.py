@@ -444,11 +444,8 @@ def SumFunxion(funxionvec, in_val):
   def dummy(x):
     yvec = []
     for funxion in funxionvec:
-      #funxion.feed( x )
-      #yvec.append(funxion.out_val)
-      #EXPERIMENTAL LOOP BODY
-      yvec.append(funxion.funx(x))
-      #END EXPERIMENTAL LOOP BODY
+      funxion.feed( x )
+      yvec.append(funxion.out_val)
     return sum(yvec)
   fu = Funxion(dummy, in_val)
   return fu
@@ -467,11 +464,8 @@ def ProdFunxion(funxionvec, in_val):
   def dummy(x):
     yvec = []
     for funxion in funxionvec:
-      #funxion.feed( x )
-      #yvec.append(funxion.out_val)
-      #EXPERIMENTAL LOOP BODY
-      yvec.append(funxion.funx(x))
-      #END EXPERIMENTAL LOOP BODY
+      funxion.feed( x )
+      yvec.append(funxion.out_val)
     return prod(yvec)
   fu = Funxion(dummy, 0)
   return fu
@@ -490,11 +484,7 @@ def Heav(x_rise):
 def Pulse(x_rise, x_fall):
   '''<Rise TIme>, <Fall Time> on independent axis   
   Returns Funxion object representing rectangular pulse function'''
-  #return SumFunxion([Heav(x_rise), Heav(x_fall).scale(-1)], 0)
-  #EXPERIMENTAL CODE BODY:
-  def dummy(x):
-    return int((x >= x_rise) and (x_fall >= x))
-  return Funxion(dummy, 0)
+  return SumFunxion([Heav(x_rise), Heav(x_fall).scale(-1)], 0)
 
 def Exp():
   '''Returns Funxion object representing 
@@ -1790,8 +1780,8 @@ class Driver:
       thv = kvec(-1, self.land.inangvec)
       #angles multiplied by negative 1
       #because of sign convention about crossing
-    if len(lav) == 0:
-      self.choose_next(self.land)
+    if len(lav) < 1:
+      self.choose_next(self)
     else:
       th_close = closest(ang, thv)
       ndx_land = thv.index(th_close)
@@ -1904,7 +1894,6 @@ land_in[2].rename("straightflank_in")
 #Instantiate Terrain
 ter = Terrain(ctr )
 ter.outpll(ctr, land_out)
-ter.outpll(ctr, land_in)
 ter.land_center.enter_car(camry,  2.7)
 
 #Instantiate Driver
@@ -1921,17 +1910,12 @@ print(strega)
 strega = ""
 
 #Test the method
-adam.choose_right()
-print("adam.choose_right() invoked\n\n")
+adam.choose_straight()
+print("adam.choose_straight() invoked\n\n")
 for i in range(5):
-  #t_first = time.time()+0
   print("\nLand = "+adam.land.name)
   print("\nPosition = "+str(adam.car.pos)+"\n\n")
-  t_first = time.time() +0
   adam.rep_long(1)
-  t_last = time.time() +0
-  dt = t_last - t_first
-  print(str(dt)+"  seconds elapsed")
 
 #print(strega)
 strega = ""
