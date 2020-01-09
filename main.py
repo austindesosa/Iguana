@@ -476,6 +476,7 @@ def ProdFunxion(funxionvec, in_val):
   fu = Funxion(dummy, 0)
   return fu
 
+
 def Heav(x_rise):
   '''<Rise time> on independent axis   
   Returns Funxion object representing unit step function
@@ -581,6 +582,17 @@ class Obstacle:
     pt += self.position
     pt += self.ray_length(ang) * eul(ang)
     return pt
+
+  def bordervec(self):
+    '''Returns list of points 
+    on border of this Obstacle,
+    as position phasors'''
+    xv=riemvec(0, 2*PI, self.funxion.BAR_NUM)
+    k = 0 + xv[0]
+    for x in xv:
+      x -= k
+    return funxvec(self.funxion.funx, xv)
+
 
   def copy(self):
     '''Returns copy of this Obstacle objects'''
@@ -993,7 +1005,7 @@ class Land:
     self.ray = to_ray(self.size*self.delta_space, avg(self.helmvec)) 
     #Phasor representing net displacement of path, in same units as Car.pos
     self.tau_max = 0 #Processor time constant
-    self.t_land = 1/100 #Polling rate, in simulated seconds, for Car objects in this Land 
+    self.t_land = 1/50 #Polling rate, in simulated seconds, for Car objects in this Land 
     #EXPERIMENTAL INSTANCE VARIABLES   
     self.outlandvec=[]
     self.outangvec=[]
@@ -1472,6 +1484,57 @@ class Land:
   def repos_all(self):
     self.repos_upstream()    
     self.repos_downstream()
+
+  def inlands_before(self, space):
+    '''<NUmber> in Car.path units
+    Returns list of Land objects which
+    Inflow to this one at some point Upstream from <space>'''
+    v=[]
+    for i in range(len(self.inlandvec)):
+      if self.inspacevec[i] <= space:
+        v.append(self.inlandvec[i])
+    return v
+
+  def inlands_after(self, space):
+    '''<Number> in Car.path units   
+    Returns list of Land objects which 
+    Inflow to this one Downstream from <space>'''
+    v = []
+    for i in range(len(self.inlandvec)):
+      if self.inspacevec[i] >= space:
+        v.append(self.inlandvec[i])
+    return v
+
+  def inlands_near(self, space, distance):
+    '''<Number> in Car.path units, <Number> in Car.path units
+    Returns list of inflows within <distance> from <space>'''
+    v = []
+    for i in range(len(self.inlandvec)):
+      d_land = abs(space - self.inspacevec[i])
+      if d_land <= distance:
+        v.append(self.inlandvec[i])
+    return v
+
+  def lands_after(self, space):
+    '''<Number> in Car.path units
+    Returns list of Lands crossing this one
+    Downstream from <space>, whether inflow or outflow'''
+    v = self.inlands_after(space)
+    for x in self.outlandvec:
+      v.append(x)
+    return v
+
+  def lands_near(self, space, distance):
+    '''<Numbr> in Car.path units, <Number> in Car.path units
+    Like Land.inlands_near, except it also includes nearby outflows'''
+    v = self.inlands_near(space, distance)
+    d_out = abs(self.endspace() - space)
+    if d_out <= distance:
+      for x in self.outlandvec:
+        v.append(x)    
+    return v
+
+
     
 
 
@@ -1689,6 +1752,22 @@ class Terrain:
       land_contact.inflow(la, inpoint)
     self.sweep()    
 
+### TERRAIN - RETURNING FUNCTIONS
+def Blankterrain():
+  return Terrain(Blankland())
+
+def Carterrain( car ):
+  '''<Car object>
+  Returns Terrain object 
+  based on instance variables in <car>'''
+  lactr = Uniformland(car.tilt, car.helm, MILE)
+  lactr.constant_frix(car.frix_coeff)
+  lactr.recompass(car.shape.orientation)
+  lactr.land_position = car.shape.position
+  terra = Terrain(lactr)
+  lactr.enter_car(car, 0)
+  terra.sweep()   
+  return terra
 
 
       
@@ -1783,13 +1862,14 @@ class Driver:
     self.next_land = downland
 
   def choose_ang(self, ang):
-    thv = self.land.outangvec
-    lav = self.land.outlandvec
+    thv = copy(self.land.outangvec)
+    lav = copy(self.land.outlandvec)
     if self.car.rev:
-      lav = self.land.inlandvec
-      thv = kvec(-1, self.land.inangvec)
-      #angles multiplied by negative 1
-      #because of sign convention about crossing
+      lav.extend(self.land.inlandvec)
+      thv.extend( kvec(-1, self.land.inangvec) )
+      for i in range(len(self.land.outlandvec)):
+        lav.pop(0)
+        thv.pop(0)
     if len(lav) == 0:
       self.choose_next(self.land)
     else:
@@ -1875,74 +1955,31 @@ print("Iguana module running\n\n")
 #Instantiate 2 Car objects
 camry, toyota = Car(1000,0,0), Car(1500,0,0)
 
-#Instantiate 7 Land objects
-ctr = Blankland()
-ctr .rename("ctr") 
-land_out, land_in = [],[]
-for i in range(3):
-  land_out.append(Blankland() )
-  land_in.append(Blankland())
+#Instantiate Land objects
+ctr = Blankland()  
+inflow_0, inflow_1, inflow_2 = Blankland(), Blankland(), Blankland()
+ctr.rename("ctr")
+inflow_0.rename("inflow_0")
+inflow_0.recompass(eul(PI/4))
+inflow_1.rename("inflow_1")
+inflow_1.recompass(eul(-1*PI/4))
+inflow_2.rename("inflow_2")
+inflow_2.recompass(eul(-1*PI/6))
+ctr.inflow(inflow_0, 0)
+ctr.inflow(inflow_1, 300)
+ctr.inflow(inflow_2, 1500)
 
-#Set the curvature of the Lands
-land_out[0].rename("left_fork")
-land_out[0].constant_helm(-1*9*DEG)
+outflow_0 = Blankland()
+outflow_0.rename("outflow_0")  
+ctr.outflow(outflow_0)
 
-land_out[1].rename("right_fork")
-land_out[1].constant_helm(8*DEG)
-
-land_out[2].rename("straight_fork")
-
-land_in[0].rename("leftflank_in")
-land_in[0].constant_helm(-1 * 5 * DEG)
-
-land_in[1].rename("rightflank_in")
-land_in[1].constant_helm(5*DEG)
-
-land_in[2].rename("straightflank_in")
-
-
-#Instantiate Terrain
-ter = Terrain(ctr )
-ter.outpll(ctr, land_out)
-ter.outpll(ctr, land_in)
-ter.land_center.enter_car(camry,  2.7)
-
-#Instantiate Driver
-adam = Driver(camry, ter)
-adam.car.respeed(55*MPH)
-adam.reverse()
-
-#Start string for the console
-strega = "BEGINNING CONDITIONS:\n"
-strega += "adam.land = "+adam.land.name+"\n"
-strega += "adam.car.shape.position = "+str(adam.car.shape.position)+"\n\n"
-
-print(strega)
 strega = ""
+v=ctr.lands_near(1580, 100)
+strega +="ctr.lands_after(1580, 100) holds the following Lands:\n"
+for x in v:
+  strega+=x.name+"\n"
+strega += "\n\n"
 
-#Test the method
-adam.choose_right()
-print("adam.choose_right() invoked\n\n")
-for i in range(5):
-  #t_first = time.time()+0
-  print("\nLand = "+adam.land.name)
-  print("\nPosition = "+str(adam.car.pos)+"\n\n")
-  t_first = time.time() +0
-  adam.rep_long(1)
-  t_last = time.time() +0
-  dt = t_last - t_first
-  print(str(dt)+"  seconds elapsed")
-
-#print(strega)
-strega = ""
-
-#Put results in console string
-strega += "ENDING CONDITIONS\n"
-strega += "adam.land = "+adam.land.name+"\n"
-strega += "adam.car.shape.position = "+str(adam.car.shape.position)+"\n\n"
-strega += "END EXPERIMENT\n\n\n"
-
-#Print console string
 print(strega)
 
 
