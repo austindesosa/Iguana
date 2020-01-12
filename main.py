@@ -1534,6 +1534,23 @@ class Land:
         v.append(x)    
     return v
 
+  def sorted_cars(self):
+    '''<Returns list of Car onjects in this Land, 
+    sorted from most upstream to most downstream'''
+    space_v = copy(self.carspacevec)
+    space_v.sort()
+    car_v = []
+    bookmark = 0
+    for i in range(len(space_v)):
+      if i >= bookmark:
+        s = space_v[i]
+        ndx_v = val_index_vec(s, self.carspacevec)
+        for ndx in ndx_v:
+          car_v.append(self.carvec[ndx])
+        bookmark += len(ndx_v)
+    return car_v
+
+
 
     
 
@@ -1806,6 +1823,100 @@ class Driver:
     self.land = self.terrain.landsearch(self.car)
     self.ndx_car = self.land.carvec.index(self.car)
 
+  def is_behind(self, other_car):
+    '''<Car object>
+    Returns True if and only if this Driver's Car
+    is Behind/Upstream from <other_car>'''
+    ret = 0
+    ndx_self = self.land.carvec.index(self.car)
+    point_self = self.land.carspacevec[ndx_self]
+    if other_car in self.land.carvec:
+      v=self.land.sorted_cars()  
+      ndx_o = v.index(other_car)
+      ret += ndx_self < ndx_o
+    for la in self.land.inlands_after(point_self):
+      ret += other_car in la.carvec
+    for la in self.land.outlandvec:
+      ret += other_car in la.carvec
+    return bool(ret)
+
+  def is_infront(self, other_car):
+    '''<Car object>
+    Returns True if and only if Driver.car
+    is in Front of / Downstream from <other_car>'''
+    ret = 0
+    ndx_self = self.land.carvec.index(self.car)
+    point_self = self.land.carspacevec[ndx_self]
+    if other_car in self.land.carvec:
+      point_car = self.land.carspacevec[self.land.carvec.index(other_car)]
+      ret += point_car < point_self
+    for la in self.land.inlands_before(point_self):
+      ret += other_car in la.carvec
+    return bool(ret)
+
+  def distance_to(self, other_car):
+    '''<Car object>
+    Returns bumper-to-bumper distance between this Driver's car and that Car,
+    in Car.path units'''
+    ret = INF
+    other_land = self.terrain.landsearch(other_car)
+    point_self = self.land.carspacevec[ self.land.carvec.index(self.car) ]
+    if self.is_behind(other_car):
+      ret = 0 - self.car.shape.ray_length(0) 
+      if other_car in self.land.carvec:
+        pt_car = self.land.carspacevec[ self.land.carvec.index(other_car) ]
+        pt_car -= other_car.shape.ray_length(PI/2)
+        ret += pt_car
+      elif other_land in self.land.outlandvec:
+        pt_car = other_land.carspacevec[ other_land.carvec.index(other_car) ]
+        pt_car += self.land.endspace() - point_self
+        pt_car -= other_car.shape.ray_length(PI/2)
+        ret += pt_car
+      elif other_land in self.land.inlands_after(point_self):
+        pt_car = other_land.endspace() 
+        pt_car -= other_land.carspacevec[other_land.carvec.index(other_car)]
+        pt_car += self.land.inspacevec[self.land.inlandvec.index(other_land)]
+        pt_car -= point_self
+        pt_car -= other_car.shape.ray_length(0)
+        ret += pt_car
+    elif self.is_infront(other_car):
+      ret = 0 - self.car.shape.ray_length(PI/2)  
+      if other_car in self.land.carvec :
+        pt_car = self.land.carspacevec[self.land.carvec.index(other_car)]
+        ret += point_self - pt_car
+        ret -= other_car.shape.ray_length(0)
+      elif other_land in self.land.inlands_before(point_self):
+        ret += point_self
+        pt_car = other_land.carspacevec[other_land.carvec.index(other_car)]
+        ret += other_land.endspace() - pt_car
+        ret -= other_car.shape.ray_length(0)
+    return ret
+
+
+
+
+
+
+  def front_car(self):
+    '''Returns Car object closest in front 
+    of this Driver object's Car'''
+    cv = self.land.sorted_cars()
+    if cv.index(self.car) < (len(cv)-1):
+      return cv[ 1 + cv.index(self.car)]
+    #Add other if/else branches
+    #to deal with nearby cars on inflows and outflows
+    else:
+      return self.car #default fir when there are no cars
+    
+  def back_car(self):
+    cv = self.land.sorted_cars()   
+    if cv.index(self.car) > 0:
+      return cv[ cv.index(self.car) - 1]
+    #Add other if/else branches 
+    #for cars on nearby inflows and outflows
+    else:
+      return self.car #default answer for when no cars behind you
+
   def reverse(self):
     '''Encapsulation of Car.reverse for this Driver object'''
     self.car.reverse()    
@@ -1861,15 +1972,9 @@ class Driver:
   def choose_next(self, downland):
     self.next_land = downland
 
-  def choose_ang(self, ang):
+  def choose_ang_out(self, ang):
     thv = copy(self.land.outangvec)
     lav = copy(self.land.outlandvec)
-    if self.car.rev:
-      lav.extend(self.land.inlandvec)
-      thv.extend( kvec(-1, self.land.inangvec) )
-      for i in range(len(self.land.outlandvec)):
-        lav.pop(0)
-        thv.pop(0)
     if len(lav) == 0:
       self.choose_next(self.land)
     else:
@@ -1952,35 +2057,66 @@ def Cardriver(car):
 
 print("Iguana module running\n\n")
 
-#Instantiate 2 Car objects
-camry, toyota = Car(1000,0,0), Car(1500,0,0)
-
-#Instantiate Land objects
-ctr = Blankland()  
-inflow_0, inflow_1, inflow_2 = Blankland(), Blankland(), Blankland()
+ctr = Blankland()
 ctr.rename("ctr")
-inflow_0.rename("inflow_0")
-inflow_0.recompass(eul(PI/4))
-inflow_1.rename("inflow_1")
-inflow_1.recompass(eul(-1*PI/4))
-inflow_2.rename("inflow_2")
-inflow_2.recompass(eul(-1*PI/6))
-ctr.inflow(inflow_0, 0)
-ctr.inflow(inflow_1, 300)
-ctr.inflow(inflow_2, 1500)
 
-outflow_0 = Blankland()
-outflow_0.rename("outflow_0")  
-ctr.outflow(outflow_0)
+dakota = Blankland()
+dakota.rename("dakota")
+ctr.outflow(dakota)
+
+montana = Blankland()
+montana.rename("montana")
+montana.recompass(EAST)
+ctr.inflow(montana, 0.87 * MILE)
+
+florida = Blankland()
+florida.rename("florida")
+florida.recompass(WEST)
+ctr.inflow(florida, 0.15 * MILE)
+
+texas = Blankland() 
+texas.rename("texas")
+texas.outflow(ctr)
+
+ter = Terrain(ctr)
+
+car_v = []
+for i in range(7):
+  car_v.append(Car(1000,0,0,))
+
+camry, camry_front, camry_back = car_v[0], car_v[1], car_v[2]
+camry_tx, camry_fla, camry_dk, camry_mt = car_v[3], car_v[4], car_v[5], car_v[6]
+camry.rename("camry")
+camry_tx.rename("camry_tx")
+camry_fla.rename("camry_fla")
+camry_dk.rename("camry_dk")
+camry_mt.rename("camry_mt")
+camry_front.rename("camry_front")
+camry_back.rename("camry_back")
+
+ctr.enter_car(camry, 0.5 * MILE)
+ctr.enter_car(camry_front, 0.9 * MILE)
+ctr.enter_car(camry_back, 0.3*MILE)
+texas.enter_car(camry_tx, 7.7)
+dakota.enter_car(camry_dk, 7.7)
+florida.enter_car(camry_fla, 7.6)
+montana.enter_car(camry_mt, 1593.5)
+
+adam = Driver(camry, ter)
 
 strega = ""
-v=ctr.lands_near(1580, 100)
-strega +="ctr.lands_after(1580, 100) holds the following Lands:\n"
-for x in v:
-  strega+=x.name+"\n"
-strega += "\n\n"
-
+for car in car_v:
+  strega+="adam.distance_to( "+car.name+" )  =  "+str(adam.distance_to(car))+"\n\n"
 print(strega)
+
+
+
+
+
+
+
+
+
 
 
 
