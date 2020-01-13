@@ -1976,15 +1976,13 @@ class Driver:
     casa += int(other_car.rev)
     casa += 2 * int(self.car.rev)
     casa += 4 * int(is_beh)
-    print("is_beh = "+str(is_beh)+"\n")
+    print("is_beh = "+str(int(is_beh))+"\n")
     print("self.car.rev = "+str(self.car.rev)+"\n")
     print("other_car.rev = "+str(other_car.rev)+"\n")
     print("casa = "+str(casa)+"\n")
-    if casa in [2,5,7]:
-      #sgn_other *= -1
+    if casa in [2,3,4,5]:
       sgn_self *= -1
-    if casa in [1,6,7]:
-      #sgn_self *= -1
+    if casa in [1,3,4,6]:
       sgn_other *= -1
     my_speed *= sgn_self
     yo_speed *= sgn_other
@@ -2169,29 +2167,37 @@ ctr.rename("ctr")
 land_left.rename("land_left")
 land_left.recompass(O_CLOCK ** 4)
 land_right.rename("land_right")
-land_right.recompass(O_CLOCK ** 8)
+land_right.recompass(O_CLOCK ** 2)
 nc = named_cars(["camry", "cam_fwd", "cam_bk"])
+camry, cam_fwd, cam_bk = nc[0], nc[1], nc[2]
 pt_cam = MILE/2
-pt_inflow = pt_cam + 100
 
-nc[0].respeed(25)
-ctr.enter_car(nc[0], pt_cam)
-ctr.enter_car(nc[1], pt_cam + 105)
-ctr.enter_car(nc[2], pt_cam - 105)
-nc[1].respeed(35)
-#nc[1].reverse()
-nc[2].respeed(15)
-#nc[2].reverse()
+ctr.enter_car(camry, pt_cam)
+ctr.enter_car(cam_bk, pt_cam - 105)
+camry.respeed(35)
+cam_bk.respeed(35)
+
+
 
 ter=Terrain(ctr)
-#ter.inpll(ctr, [land_right, land_left], pt_inflow)
+my_rev = [0,0,1,1]
+yo_rev = [0,1,0,1]
 
-adam = Driver(nc[0], ter)
-#adam.reverse()
+adam = Driver(camry, ter)
 strega = ""
-for x in [nc[1], nc[2]]:
-  strega += "adam.t_collision( "+x.name+" )  =  "+str(adam.t_collision(x))+"\n"
+for i in range(4):
+  if(my_rev[i]):
+    camry.reverse()   
+  else:
+    camry.forward()    
+  if(yo_rev[i]):
+    cam_bk.reverse()   
+  else:
+    cam_bk.forward()   
+  strega += "adam.t_collision( cam_bk) = "+str(adam.t_collision(cam_bk))+"\n"
 print(strega)
+
+#print(strega)
 
 
 
