@@ -966,7 +966,21 @@ class Car:
     strega += "END Car   "+self.name+"   attributes\n\n\n"
     return strega
 
+### CAR - RETURNING FUNCTIONS
 
+def Blankcar():
+  '''Returns Car with default instance variables'''
+  return Car(1000,0,0)
+
+def named_cars(name_vec):
+  '''<List of Strings>
+  Returns list of Car objects 
+  with those names'''
+  x = []
+  for i in range(len(name_vec)):
+    x.append(Blankcar())
+    x[i].rename(name_vec[i])
+  return x
 
 ### LAND OBJECT 
 
@@ -1786,7 +1800,22 @@ def Carterrain( car ):
   terra.sweep()   
   return terra
 
-
+def Fleurterrain(fork_helm):
+  '''<helm> for the curved branches 
+  Returrns Terrain object in the shape of a fleur-de-lis
+  '''
+  out_v, in_v = [],[]
+  for i in range(3):
+    h = fork_helm * (i - 1)
+    b1, b2 = Blankland(), Blankland()
+    b1.constant_helm(h)   
+    b2.constant_helm(h)    
+    out_v.append(b1)
+    in_v.append(b2)
+  ter = Blankterrain()   
+  ter.outpll(ter.land_center, out_v) 
+  ter.inpll(ter.land_center, in_v, 0)
+  return ter
       
 
 
@@ -1858,39 +1887,112 @@ class Driver:
     '''<Car object>
     Returns bumper-to-bumper distance between this Driver's car and that Car,
     in Car.path units'''
+    #print("\n\nDriver.distance_to engaged\n")
     ret = INF
     other_land = self.terrain.landsearch(other_car)
     point_self = self.land.carspacevec[ self.land.carvec.index(self.car) ]
+    #print("point_self = "+str(point_self)+"\n")
     if self.is_behind(other_car):
-      ret = 0 - self.car.shape.ray_length(0) 
+      #print("self.is_behind( "+other_car.name+" )\n")
+      ret = 0 - self.car.shape.ray_length(0)
+      #print("ret = "+str(ret)+"\n") 
       if other_car in self.land.carvec:
+        #print("other_car in self.land.carvec\n")
         pt_car = self.land.carspacevec[ self.land.carvec.index(other_car) ]
-        pt_car -= other_car.shape.ray_length(PI/2)
-        ret += pt_car
-      elif other_land in self.land.outlandvec:
-        pt_car = other_land.carspacevec[ other_land.carvec.index(other_car) ]
-        pt_car += self.land.endspace() - point_self
-        pt_car -= other_car.shape.ray_length(PI/2)
-        ret += pt_car
-      elif other_land in self.land.inlands_after(point_self):
-        pt_car = other_land.endspace() 
-        pt_car -= other_land.carspacevec[other_land.carvec.index(other_car)]
-        pt_car += self.land.inspacevec[self.land.inlandvec.index(other_land)]
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car -= other_car.shape.ray_length(PI)
+        #print("pt_car = "+str(pt_car)+"\n")
         pt_car -= point_self
-        pt_car -= other_car.shape.ray_length(0)
+        #print("pt_car = "+str(pt_car)+"\n")
         ret += pt_car
+        #print("ret += pt_car\nret = "+str(ret)+"\n")
+      elif other_land in self.land.outlandvec:
+        #print("other_land in self.land.outlandvec")
+        pt_car = other_land.carspacevec[ other_land.carvec.index(other_car) ]
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car += self.land.endspace() - point_self
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car -= other_car.shape.ray_length(PI/2)
+        #print("pt_car = "+str(pt_car)+"\n")
+        ret += pt_car
+        #print("ret += pt_car\nret = "+str(ret)+"\n")
+      elif other_land in self.land.inlands_after(point_self):
+        #print("other_land in inland_after\n")
+        pt_car = other_land.endspace() 
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car -= other_land.carspacevec[other_land.carvec.index(other_car)]
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car += self.land.inspacevec[self.land.inlandvec.index(other_land)]
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car -= point_self
+        #print("pt_car = "+str(pt_car)+"\n")
+        pt_car -= other_car.shape.ray_length(0)
+        #print("pt_car = "+str(pt_car)+"\n")
+        ret += pt_car
+        #print("ret += pt_car\nret = "+str(ret)+"\n")
     elif self.is_infront(other_car):
-      ret = 0 - self.car.shape.ray_length(PI/2)  
+      #print("self.is_infront( "+other_car.name+")\n")
+      ret = 0 - self.car.shape.ray_length(PI)  
+      #print("ret = "+str(ret)+"\n")
       if other_car in self.land.carvec :
+        #print("other_car in self.land.carvec\n")
         pt_car = self.land.carspacevec[self.land.carvec.index(other_car)]
+        #print("pt_car = "+str(pt_car)+"\n")
         ret += point_self - pt_car
+        #print("ret += point_self - pt_car\nret = "+str(ret)+"\n")
         ret -= other_car.shape.ray_length(0)
+        #print("ret = "+str(ret)+"\n")
       elif other_land in self.land.inlands_before(point_self):
+        #print("other_land in self.land.inlands_before(point_self)\n")
         ret += point_self
+        #print("ret = "+str(ret)+"\n")
         pt_car = other_land.carspacevec[other_land.carvec.index(other_car)]
+        #print("pt_car = "+str(pt_car)+"\n")
         ret += other_land.endspace() - pt_car
+        #print("other_land.endspace() = "+str(other_land.endspace())+"\n")
+        #print("ret += other_land.endspace() - pt_car\n")
+        #print("ret = "+str(ret)+"\n")
         ret -= other_car.shape.ray_length(0)
+        #print("ret = "+str(ret)+"\n")
+    #print("Final value: ret = "+str(ret)+"\n\n")
     return ret
+
+  def t_collision(self, other_car):
+    '''<Car object>
+    Returns time, in seconds, 
+    until Driver.car would collide with <car>
+    at their present speeds'''
+    print("\n\nDriver.t_collision engaged\n")
+    distance = self.distance_to(other_car)
+    print("Driver.distance_to( "+other_car.name+" )  =  "+str(distance)+"\n")
+    point_self = self.land.carspacevec[self.land.carvec.index(self.car)]
+    print("point_self = "+str(point_self)+"\n")
+    speed_twd = 0
+    my_speed = 0 + self.car.speed  
+    yo_speed = 0 + other_car.speed
+    sgn_other, sgn_self = 1,1
+    is_beh = self.is_behind(other_car)
+    print("is_beh = "+str(is_beh)+"\n")
+    print("self.car.rev = "+str(self.car.rev)+"\n")
+    print("other_car.rev = "+str(other_car.rev)+"\n")
+    if (is_beh == other_car.rev):
+      #sgn_other *= -1
+      sgn_self *= -1
+    if (is_beh != self.car.rev):
+      #sgn_self *= -1
+      sgn_other *= -1
+    my_speed *= sgn_self
+    yo_speed *= sgn_other
+    print("my_speed = "+str(my_speed)+"\n")
+    print("yo_speed = "+str(yo_speed)+"\n")
+    speed_twd += my_speed + yo_speed
+    if speed_twd < 0:
+      speed_twd = 0
+    print("speed_twd = "+str(speed_twd)+"\n")
+    ret =  xdiv(0, distance, speed_twd)
+    print("returning "+str(ret)+"\n\n\n")
+    return ret
+    
 
 
 
@@ -2057,73 +2159,36 @@ def Cardriver(car):
 
 print("Iguana module running\n\n")
 
-ctr = Blankland()
+ctr, land_left, land_right = Blankland(), Blankland(), Blankland()
 ctr.rename("ctr")
+land_left.rename("land_left")
+land_left.recompass(O_CLOCK ** 4)
+land_right.rename("land_right")
+land_right.recompass(O_CLOCK ** 8)
+nc = named_cars(["camry", "cam_fwd", "cam_bk"])
+pt_cam = MILE/2
+pt_inflow = pt_cam + 100
 
-dakota = Blankland()
-dakota.rename("dakota")
-ctr.outflow(dakota)
+nc[0].respeed(25)
+ctr.enter_car(nc[0], pt_cam)
+ctr.enter_car(nc[1], pt_cam + 105)
+ctr.enter_car(nc[2], pt_cam - 105)
+nc[1].respeed(35)
+nc[1].reverse()
+nc[2].respeed(15)
+nc[2].reverse()
 
-montana = Blankland()
-montana.rename("montana")
-montana.recompass(EAST)
-ctr.inflow(montana, 0.87 * MILE)
+ter=Terrain(ctr)
+#ter.inpll(ctr, [land_right, land_left], pt_inflow)
 
-florida = Blankland()
-florida.rename("florida")
-florida.recompass(WEST)
-ctr.inflow(florida, 0.15 * MILE)
-
-texas = Blankland() 
-texas.rename("texas")
-texas.outflow(ctr)
-
-ter = Terrain(ctr)
-
-car_v = []
-for i in range(7):
-  car_v.append(Car(1000,0,0,))
-
-camry, camry_front, camry_back = car_v[0], car_v[1], car_v[2]
-camry_tx, camry_fla, camry_dk, camry_mt = car_v[3], car_v[4], car_v[5], car_v[6]
-camry.rename("camry")
-camry_tx.rename("camry_tx")
-camry_fla.rename("camry_fla")
-camry_dk.rename("camry_dk")
-camry_mt.rename("camry_mt")
-camry_front.rename("camry_front")
-camry_back.rename("camry_back")
-
-ctr.enter_car(camry, 0.5 * MILE)
-ctr.enter_car(camry_front, 0.9 * MILE)
-ctr.enter_car(camry_back, 0.3*MILE)
-texas.enter_car(camry_tx, 7.7)
-dakota.enter_car(camry_dk, 7.7)
-florida.enter_car(camry_fla, 7.6)
-montana.enter_car(camry_mt, 1593.5)
-
-adam = Driver(camry, ter)
-
+adam = Driver(nc[0], ter)
+adam.reverse()
 strega = ""
-for car in car_v:
-  strega+="adam.distance_to( "+car.name+" )  =  "+str(adam.distance_to(car))+"\n\n"
+for x in [nc[1], nc[2]]:
+  strega += "adam.t_collision( "+x.name+" )  =  "+str(adam.t_collision(x))+"\n"
 print(strega)
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
 
