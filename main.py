@@ -1970,15 +1970,20 @@ class Driver:
     speed_twd = 0
     my_speed = 0 + self.car.speed  
     yo_speed = 0 + other_car.speed
-    sgn_other, sgn_self = 1,1
+    sgn_self, sgn_other = -1,1
     is_beh = self.is_behind(other_car)
+    casa = 0
+    casa += int(other_car.rev)
+    casa += 2 * int(self.car.rev)
+    casa += 4 * int(is_beh)
     print("is_beh = "+str(is_beh)+"\n")
     print("self.car.rev = "+str(self.car.rev)+"\n")
     print("other_car.rev = "+str(other_car.rev)+"\n")
-    if (is_beh == other_car.rev):
+    print("casa = "+str(casa)+"\n")
+    if casa in [2,5,7]:
       #sgn_other *= -1
       sgn_self *= -1
-    if (is_beh != self.car.rev):
+    if casa in [1,6,7]:
       #sgn_self *= -1
       sgn_other *= -1
     my_speed *= sgn_self
@@ -2174,15 +2179,15 @@ ctr.enter_car(nc[0], pt_cam)
 ctr.enter_car(nc[1], pt_cam + 105)
 ctr.enter_car(nc[2], pt_cam - 105)
 nc[1].respeed(35)
-nc[1].reverse()
+#nc[1].reverse()
 nc[2].respeed(15)
-nc[2].reverse()
+#nc[2].reverse()
 
 ter=Terrain(ctr)
 #ter.inpll(ctr, [land_right, land_left], pt_inflow)
 
 adam = Driver(nc[0], ter)
-adam.reverse()
+#adam.reverse()
 strega = ""
 for x in [nc[1], nc[2]]:
   strega += "adam.t_collision( "+x.name+" )  =  "+str(adam.t_collision(x))+"\n"
