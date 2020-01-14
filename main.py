@@ -2162,44 +2162,40 @@ def Cardriver(car):
 
 print("Iguana module running\n\n")
 
-ctr, land_left, land_right = Blankland(), Blankland(), Blankland()
-ctr.rename("ctr")
-land_left.rename("land_left")
-land_left.recompass(O_CLOCK ** 4)
-land_right.rename("land_right")
-land_right.recompass(O_CLOCK ** 2)
-nc = named_cars(["camry", "cam_fwd", "cam_bk"])
-camry, cam_fwd, cam_bk = nc[0], nc[1], nc[2]
-pt_cam = MILE/2
+camry = Blankcar()
+my_tilt, my_frix = 5 * DEG, 0.07
+camry.tilt, camry.frix = my_tilt, my_frix
+T_GO = 1/100
 
-ctr.enter_car(camry, pt_cam)
-ctr.enter_car(cam_bk, pt_cam - 105)
-camry.respeed(35)
-cam_bk.respeed(35)
-
-
-
-ter=Terrain(ctr)
-my_rev = [0,0,1,1]
-yo_rev = [0,1,0,1]
-
+camry.pwr_drive = 10000
+toyota = camry.copy() 
+jeep = camry.copy()
+camry.sweep() 
+toyota.sweep()
+kansas = Blankland()
+kansas.constant_tilt(camry.tilt)
+kansas.constant_frix(camry.frix_coeff)
+kansas.t_land = T_GO
+kansas.enter_car(camry, 0)
+kansas.enter_car(toyota, 0.5*MILE)
+#kansas.enter_car(jeep, 0.7 * MILE)
+ter = Terrain(kansas)
 adam = Driver(camry, ter)
+adam.drivefunxion = Konstant(10000)
+adam.t_num = 10
+
+
 strega = ""
-for i in range(4):
-  if(my_rev[i]):
-    camry.reverse()   
-  else:
-    camry.forward()    
-  if(yo_rev[i]):
-    cam_bk.reverse()   
-  else:
-    cam_bk.forward()   
-  strega += "adam.t_collision( cam_bk) = "+str(adam.t_collision(cam_bk))+"\n"
+tau_init = 0 + time.time()   
+
+#SIMULATION
+adam.rep_long(1)
+#END SIMULATION
+tau_final = time.time() + 0
+tau_diff = tau_final - tau_init
+
+strega += "Processor time elapsed =  "+str(tau_diff)+"  seconds\n\n"
+strega += camry.str_motion()   
 print(strega)
-
-#print(strega)
-
-
-
 
 
