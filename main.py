@@ -2107,7 +2107,7 @@ class Driver:
   def choose_next(self, downland):
     self.next_land = downland
 
-  def choose_ang_out(self, ang):
+  def choose_ang(self, ang):
     thv = copy(self.land.outangvec)
     lav = copy(self.land.outlandvec)
     if len(lav) == 0:
@@ -2201,7 +2201,7 @@ class Driver:
     '''<Time in seconds> to be simulated
     Iterates Driver.react andn Driver.voy_short
     until it has simulated <dur_t> seconds'''
-    n = int( dur_t // (self.t_num * self.land.t_land) )
+    n = 1 + int( dur_t // (self.t_num * self.land.t_land) )
     for i in range(n):
       self.react(self.t_observe, self.k_react)
       self.voy_short()   
@@ -2277,7 +2277,7 @@ kansas.enter_car(toyota, 105)
 ter = Terrain(kansas)
 adam = Driver(camry, ter)
 
-adam.t_num = 10
+adam.t_num = 5
 
 
 
