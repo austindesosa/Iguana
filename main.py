@@ -1838,6 +1838,8 @@ class Driver:
     self.other_funxion = self.car.other_fxn()
     self.drive_funx, self.other_funx = self.drive_funxion.funx, self.other_funxion.funx
     self.ndx_car = self.land.carvec.index(self.car)
+    self.t_observe = 10.0
+    self.k_react = 0.5
 
   def sweep(self):
     #self.land = self.terrain.landsearch(self.car)
@@ -2195,6 +2197,18 @@ class Driver:
       self.react_front(t_cush, k)
     self.sweep()
 
+  def voyage(self, dur_t):
+    '''<Time in seconds> to be simulated
+    Iterates Driver.react andn Driver.voy_short
+    until it has simulated <dur_t> seconds'''
+    n = int( dur_t // (self.t_num * self.land.t_land) )
+    for i in range(n):
+      self.react(self.t_observe, self.k_react)
+      self.voy_short()   
+    self.sweep()   
+
+  
+
 
    
 
@@ -2273,9 +2287,7 @@ strega = ""
 tau_init = 0 + time.time()   
 
 #SIMULATION
-for i in range(100):
-  adam.react(10, 0.5)
-  adam.voy()
+adam.voyage(1)
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
