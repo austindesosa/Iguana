@@ -764,7 +764,7 @@ class Car:
     self.sweep()
     if (self.pwr_net < 0) and ( abs(self.pwr_net * delta_t) > energy_initial):
       d_t = energy_initial / self.pwr_net #amount of time it will take car to stop at this rate
-    time.sleep(self.delta_tau) #delay for threading purposes
+    #time.sleep(self.delta_tau) #delay for threading purposes
     self.energy += self.pwr_net * d_t
     #
     self.t_now += d_t
@@ -1228,7 +1228,7 @@ class Land:
   
       
     
-  def ir_raw(self, car,  space):
+  def ir(self, car,  space):
     '''<Car object>,  <Point where it is>  on the road in Car.path units
     Induces Car.go method in <car>,
     simulating self.t_land seconds of motion,
@@ -1248,10 +1248,10 @@ class Land:
     else:
       self.carspacevec[ndx_car] -= car.delta_path
 
-  def ir(self, car,  space):
+  def ir_threaded(self, car,  space):
     '''<Car object>,  <Place> on the road, in car.path units 
     Threaded version of   Land.ir_raw( Car,  float )'''
-    thr = threading.Thread(target = self.ir_raw, name = "", args = (car,  space))
+    thr = threading.Thread(target = self.ir, name = "", args = (car,  space))
     thr.start()
 
   def ir_todos(self):
@@ -1262,7 +1262,7 @@ class Land:
     #because we take those from this Land object's instance variables.
     #delta_t_vec = podvec(self.t_land, len(self.carvec))
     v = funxvec_2(self.ir, self.carvec,  self.carspacevec)
-    time.sleep(self.tau_max)
+    #time.sleep(self.tau_max)
 
   def ir_other_raw(self, drivefunxion, otherfunxion, ndx_car):
     #@param   drivefunxion   is Funxion object 
@@ -2184,12 +2184,18 @@ adam = Driver(camry, ter)
 adam.drivefunxion = Konstant(10000)
 adam.t_num = 10
 
+o_fxn = camry.other_fxn()
+f_x = o_fxn.funx
+
+
 
 strega = ""
 tau_init = 0 + time.time()   
 
 #SIMULATION
-adam.rep_long(1)
+for i in range(100):
+  camry.pwr_other = f_x(camry.energy)
+  kansas.ir_todos()
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
