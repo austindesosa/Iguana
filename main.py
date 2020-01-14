@@ -1988,11 +1988,11 @@ class Driver:
     Returns time, in seconds, 
     until Driver.car would collide with <car>
     at their present speeds'''
-    print("\n\nDriver.t_collision engaged\n")
+    #print("\n\nDriver.t_collision engaged\n")
     distance = self.distance_to(other_car)
-    print("Driver.distance_to( "+other_car.name+" )  =  "+str(distance)+"\n")
+    #print("Driver.distance_to( "+other_car.name+" )  =  "+str(distance)+"\n")
     point_self = self.land.carspacevec[self.land.carvec.index(self.car)]
-    print("point_self = "+str(point_self)+"\n")
+    #print("point_self = "+str(point_self)+"\n")
     speed_twd = 0
     my_speed = 0 + self.car.speed  
     yo_speed = 0 + other_car.speed
@@ -2002,24 +2002,26 @@ class Driver:
     casa += int(other_car.rev)
     casa += 2 * int(self.car.rev)
     casa += 4 * int(is_beh)
-    print("is_beh = "+str(int(is_beh))+"\n")
-    print("self.car.rev = "+str(self.car.rev)+"\n")
-    print("other_car.rev = "+str(other_car.rev)+"\n")
-    print("casa = "+str(casa)+"\n")
+    #print("is_beh = "+str(int(is_beh))+"\n")
+    #print("self.car.rev = "+str(self.car.rev)+"\n")
+    #print("other_car.rev = "+str(other_car.rev)+"\n")
+    #print("casa = "+str(casa)+"\n")
     if casa in [2,3,4,5]:
       sgn_self *= -1
     if casa in [1,3,4,6]:
       sgn_other *= -1
     my_speed *= sgn_self
     yo_speed *= sgn_other
-    print("my_speed = "+str(my_speed)+"\n")
-    print("yo_speed = "+str(yo_speed)+"\n")
+    #print("my_speed = "+str(my_speed)+"\n")
+    #print("yo_speed = "+str(yo_speed)+"\n")
     speed_twd += my_speed + yo_speed
     if speed_twd < 0:
       speed_twd = 0
-    print("speed_twd = "+str(speed_twd)+"\n")
+    #print("speed_twd = "+str(speed_twd)+"\n")
     ret =  xdiv(0, distance, speed_twd)
-    print("returning "+str(ret)+"\n\n\n")
+    if other_car == self:
+      ret += INF
+    #print("returning "+str(ret)+"\n\n\n")
     return ret
     
 
@@ -2133,11 +2135,8 @@ class Driver:
     self.choose_ang(PI/2)
 
   def adjust_pwr(self):
-    #self.other_funxion(self.car.energy)
     self.car.pwr_other = self.other_funx(self.car.energy)
-    #self.drive_funx(self.terrain.t_life)
     self.pwr_out = self.drive_funx(self.car.t_now)
-    #self.car.pwr_drive = self.pwr_out
     self.sweep()
 
   def voy(self):
@@ -2156,6 +2155,54 @@ class Driver:
     for i in range(self.t_num):
       self.voy()   
     self.sweep()
+
+  def react_front(self, t_cush, k):
+    '''<Maximum anticipated collision time> worth reacting to, <Number between 0 and 1>
+    Reacts to oncoming obstacles in Front of the car'''
+    fc = self.front_car()
+    t_col = self.t_collision(fc)
+    if t_col <= t_cush:
+      if self.car.rev == fc.rev:
+        t_rxn = k * t_col
+        self.redrive(self.tospeed_fxn(fc.speed, t_rxn))
+      elif (not self.car.rev) and (fc.rev):
+        self.reverse()   
+        t_rxn = k * t_col
+        self.redrive(self.tospeed_fxn(fc.speed, t_rxn))
+    self.sweep()
+
+  def react_back(self, t_cush, k):
+    '''<Minimum collision time>, <Factor between reaction and collision time>
+    Like Driver.react_front but for vehicles approaching your rear'''
+    bc = self.back_car() 
+    t_col = self.collision(bc)
+    if t_col <= t_cush:
+      if self.car.rev == bc.rev:
+        t_rxn = k * t_col
+        self.redrive(self.tospeed_fxn(bc.speed, t_rxn))
+      elif self.car.rev and (not bc.rev):
+        self.forward()   
+        t_rxn = k * t_col
+        self.redrive(self.tospeed_fxn(bc.speed, t_rxn))
+    self.sweep()    
+
+  def react(self, t_cush, k):
+    '''<Minimum time until collision>, <Factor> between reaction and collision time
+    Does either Driver.react_back or Driver.react_front, whichever is more needed'''
+    if self.t_collision(self.back_car()) < self.t_collision(self.front_car()):
+      self.react_back(t_cush, k)
+    else:
+      self.react_front(t_cush, k)
+    self.sweep()
+
+
+   
+
+  
+
+
+
+    
 
 
 
@@ -2199,9 +2246,11 @@ my_tilt, my_frix = 5 * DEG, 0.07
 camry.tilt, camry.frix = my_tilt, my_frix
 T_GO = 1/100
 
+camry.respeed(25)
+
 camry.pwr_drive = 10000
 toyota = camry.copy() 
-jeep = camry.copy()
+toyota.respeed(10)
 camry.sweep() 
 toyota.sweep()
 kansas = Blankland()
@@ -2209,11 +2258,11 @@ kansas.constant_tilt(camry.tilt)
 kansas.constant_frix(camry.frix_coeff)
 kansas.t_land = T_GO
 kansas.enter_car(camry, 0)
-kansas.enter_car(toyota, 0.5*MILE)
-#kansas.enter_car(jeep, 0.7 * MILE)
+kansas.enter_car(toyota, 105)
+
 ter = Terrain(kansas)
 adam = Driver(camry, ter)
-adam.redrive(Konstant(10000))
+
 adam.t_num = 10
 
 
@@ -2224,7 +2273,9 @@ strega = ""
 tau_init = 0 + time.time()   
 
 #SIMULATION
-adam.voy_long(1)
+for i in range(100):
+  adam.react(10, 0.5)
+  adam.voy()
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
