@@ -1836,10 +1836,13 @@ class Driver:
     self.next_land = terrain.land_center 
     self.drive_funxion = self.car.drive_fxn()
     self.other_funxion = self.car.other_fxn()
+    self.drive_funx, self.other_funx = self.drive_funxion.funx, self.other_funxion.funx
     self.ndx_car = self.land.carvec.index(self.car)
 
   def sweep(self):
     #self.land = self.terrain.landsearch(self.car)
+    #self.other_funx = self.other_funxion.funx
+    #self.drive_funx = self.drive_funxion.funx
     self.car.pwr_drive = self.pwr_out
     space = self.land.carspacevec[self.ndx_car]
     if self.car.rev and (space < 0):
@@ -1851,6 +1854,29 @@ class Driver:
     self.terrain.sweep
     self.land = self.terrain.landsearch(self.car)
     self.ndx_car = self.land.carvec.index(self.car)
+
+  def redrive(self, fxn):
+    '''<Funxion object> representing engine power
+    Sets self.drive_funxion to <fxn>'''
+    self.drive_funxion = fxn
+    self.drive_funx = self.drive_funxion.funx
+    self.pwr_out = self.drive_funx(self.car.t_now)
+    self.sweep()  
+
+  def reother(self, fxn):
+    '''<Funxion object> represnting friction power
+    Sets self.other_funxtion to <fxn>'''
+    self.other_funxion = fxn
+    self.other_funx = self.other_funxion.funx
+    self.car.pwr_other = self.other_funx(self.energy)
+    self.sweep()
+
+  def refunxion(self, dri, oth):
+    '''<Funxion> for engine power, <Function> for friction Power
+    Redoes the Funxionsin this Driver'''
+    self.reother(oth)
+    self.redrive(dri)
+
 
   def is_behind(self, other_car):
     '''<Car object>
@@ -2108,25 +2134,31 @@ class Driver:
 
   def adjust_pwr(self):
     #self.other_funxion(self.car.energy)
-    self.car.pwr_other = self.other_funxion.funx(self.car.energy)
+    self.car.pwr_other = self.other_funx(self.car.energy)
     #self.drive_funx(self.terrain.t_life)
-    self.pwr_out = self.drive_funxion.funx(self.terrain.t_life)
+    self.pwr_out = self.drive_funx(self.car.t_now)
     #self.car.pwr_drive = self.pwr_out
     self.sweep()
 
-  def rep_driver(self, dur_t):
-    self.adjust_pwr()    
-    self.terrain.rep(dur_t)
-    self.sweep()      
+  def voy(self):
+    self.adjust_pwr()
+    for la in self.terrain.landvec:
+      la.ir_todos()
+    self.sweep()   
 
-  def rep_short(self):
-    self.rep_driver(self.t_num * self.terrain.t_terrain)
-
-  def rep_long(self, dur_sim):
-    t_unit = self.t_num * self.terrain.t_terrain
-    n = int(dur_sim // t_unit)
+  def voy_long(self, dur_t):
+    n = int(dur_t // self.land.t_land)
     for i in range(n):
-      self.rep_short()
+      self.voy() 
+    self.sweep()
+
+  def voy_short(self):
+    for i in range(self.t_num):
+      self.voy()   
+    self.sweep()
+
+
+
 
 
 ### DRIVER - RETURNING FUNCTIONS
@@ -2181,11 +2213,10 @@ kansas.enter_car(toyota, 0.5*MILE)
 #kansas.enter_car(jeep, 0.7 * MILE)
 ter = Terrain(kansas)
 adam = Driver(camry, ter)
-adam.drivefunxion = Konstant(10000)
+adam.redrive(Konstant(10000))
 adam.t_num = 10
 
-o_fxn = camry.other_fxn()
-f_x = o_fxn.funx
+
 
 
 
@@ -2193,9 +2224,7 @@ strega = ""
 tau_init = 0 + time.time()   
 
 #SIMULATION
-for i in range(100):
-  camry.pwr_other = f_x(camry.energy)
-  kansas.ir_todos()
+adam.voy_long(1)
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
