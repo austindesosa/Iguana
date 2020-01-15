@@ -1887,6 +1887,13 @@ class Driver:
     in Car.path units relative to startpoint of Land'''
     return self.land.carspacevec[self.ndx_car]
 
+  def resel(self, fxn):
+    '''<Funxion> to provide select index for self.reservevec
+    Changes self.sel_funxion and self.sel_funx
+    for this Driver object'''
+    self.sel_funxion = fxn
+    self.sel_funx = self.sel_funxion.funx
+
   def redrive(self, fxn):
     '''<Funxion object> representing engine power
     Sets self.drive_funxion to <fxn> for this Driver'''
@@ -2096,6 +2103,16 @@ class Driver:
     '''Returns position phasor returning centerpointof this Driver object's Car'''
     return self.car.shape.position
 
+  def sel_robin(self, t_turn):
+    '''<Duration of each turn> in seconds
+    Changes select Funxion to a round-robin scheme
+    with <t_turn> seconds for each Funxion in self.reservevec'''
+    def dummy(t):
+      pd = t_turn * len(self.reservevec)
+      tmod = t % pd
+      return int(tmod // t_turn)
+    self.resel(Funxion(dummy, self.car.t_now))
+
 
 
   def pwr_equilibrium(self):
@@ -2182,6 +2199,11 @@ class Driver:
     self.pwr_out = self.drive_funx(self.car.t_now)
     self.sweep()
 
+  def select_pwr(self):
+    sel = self.sel_funx(self.car.t_now)
+    self.redrive(self.reservevec[sel])
+    self.adjust_pwr()
+
   def voy(self):
     self.adjust_pwr()
     for la in self.terrain.landvec:
@@ -2225,8 +2247,8 @@ class Driver:
         self.redrive(self.tospeed_fxn(fc.speed, t_rxn))
     elif self.land.STOP_SIGN and (not self.rev):
       space_til = self.land.endspace() - self.landspace()
-      t_til = space_til / self.speed
-      self.redrive(self.brake_fxn(self.k_react * t_til))
+      space_til -= self.car.shape.ray_length(0)
+      self.redrive(self.brake_fxn(space_til))
     self.sweep()
 
   def react_back(self, t_cush, k):
@@ -2259,7 +2281,7 @@ class Driver:
     until it has simulated <dur_t> seconds'''
     n = 1 + int( dur_t // (self.t_num * self.land.t_land) )
     for i in range(n):
-      self.react(self.t_observe, self.k_react)
+      self.select_pwr()
       self.voy_short()   
     self.sweep()   
 
@@ -2390,6 +2412,10 @@ kansas.name_all()
 ter = Terrain(kansas)
 adam = Driver(camry, ter)
 
+rv = [Konstant(0), Konstant(100000), Konstant(200000)]
+adam.reservevec = rv
+adam.sel_robin(0.7)
+
 adam.t_num = 5
 world = Stage(adam)
 world.name_ivs()
@@ -2400,7 +2426,7 @@ for i in range(len(world.objvec)):
   drv.append(obj.steady_fxn())
 
 kansas.SPEED_LIMIT = 25 
-world.redrivevec([Exp().scale(10000).scale_x(-1), Ramp(10000)])
+#world.redrivevec([Exp().scale(10000).scale_x(-1), Ramp(10000)])
 
 
 
@@ -2414,8 +2440,7 @@ strega += "Simulating 1 second of motion\n\n"
 tau_init = 0 + time.time()   
 
 #SIMULATION
-for i in range(100):
-  world.moment()
+adam.voyage(1)
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
