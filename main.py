@@ -1290,56 +1290,7 @@ class Land:
     #delta_t_vec = podvec(self.t_land, len(self.carvec))
     v = funxvec_2(self.ir, self.carvec,  self.carspacevec)
     #time.sleep(self.tau_max)
-
-  def ir_other_raw(self, drivefunxion, otherfunxion, ndx_car):
-    #@param   drivefunxion   is Funxion object 
-    #   representing Car.pwr_drive vs. time
-    #@param   otherfunxion   is Funxion object 
-    #   representing Car.pwr_other vs. kinetic energy
-    #@param   ndx_car   is an int representing 
-    #   the index of self.carvec
-    #Induces the method Car.go_other( Funxion, Funxion )
-    #in a Car object which is already in this Land object
-    car = self.carvec[ndx_car]
-    self.sweep() 
-    car.go_other(drivefunxion, otherfunxion)
-    signum = 1
-    if car.rev:
-      signum *= -1
-    #car.path += signum * car.delta_path
-    self.carspacevec[ndx_car] += signum * car.delta_path 
-
-  def ir_other(self, drivefunxion, otherfunxion, ndx_car):
-    thr = threading.Thread(target = self.ir_other_raw, name="", args = (drivefunxion, otherfunxion, ndx_car))
-    thr.start()
     
-  def ir_otros(self, drivevec, othervec):
-    #@param   drivevec   is a List of Funxion objects 
-    #   to be used to calculate Car.pwr_drive  
-    #@param   othervec   ... calculate Car.pwr_other
-    #Lists correspond to self.carvec
-    #Does method self.ir_other,
-    #but on every Car in this Land object  
-    for i in range(len(self.carvec)):
-      drive, other = drivevec[i], othervec[i]
-      self.ir_other(drive, other, i)
-    time.sleep(self.tau_max) 
-    
-  def ir_mios(self):
-    #Does self.ir_otros
-    #but using only the instance variables
-    #in this Land object
-    self.ir_otros(self.drivevec, self.othervec)
-    
-  def viaje(self, dur_t):
-    '''#@param   dur_t   is number of seconds
-    #of time you wish to simulate.  
-    #Iterates the method self.ir_mios
-    #for <dur_t> simulated seconds''' 
-    n = int(dur_t // self.t_land)
-    for i in range(n):
-      self.ir_mios()
-    self.sweep()
 
   def repitar(self, dur_t):
     '''<Number> of seconds of simulated time
@@ -1907,6 +1858,13 @@ class Driver:
     self.ndx_car = self.land.carvec.index(self.car)
     self.t_observe = 10.0
     self.k_react = 0.5
+    #EXPERIMENTAL CODE
+    self.reservevec = []
+    for i in range(8):
+      self.reservevec.append(Konstant(0))
+    self.sel_funxion = Konstant(0)
+    self.sel_funx = self.sel_funxion.funx
+
 
   def sweep(self):
     #self.land = self.terrain.landsearch(self.car)
@@ -1936,6 +1894,7 @@ class Driver:
       self.drive_funxion = fxn
       self.drive_funx = self.drive_funxion.funx
     self.pwr_out = self.drive_funx(self.car.t_now)
+    self.car.pwr_drive = self.pwr_out
     self.sweep()  
 
   def reother(self, fxn):
@@ -2013,7 +1972,6 @@ class Driver:
         pt_car = other_land.carspacevec[ other_land.carvec.index(other_car) ]
         #print("pt_car = "+str(pt_car)+"\n")
         pt_car += self.land.endspace() - point_self
-        #print("pt_car = "+str(pt_car)+"\n")
         pt_car -= other_car.shape.ray_length(PI/2)
         #print("pt_car = "+str(pt_car)+"\n")
         ret += pt_car
@@ -2177,10 +2135,13 @@ class Driver:
     else:
       return SumFunxion([self.fast_fxn(speed, dur_accel), self.steady_fxn()] , self.terrain.t_life)
     
-  def brake_fxn(self, dur_accel):
-    '''<Time> in which you wish to brake
+  def brake_fxn(self, dist):
+    '''<Stopping distance> in which you wish to brake
     Returns Funxion object representing power output
     to make that happen'''
+    kin_avg = 0.5 *self.car.energy
+    speed_avg = (2 * kin_avg / self.car.mass) ** 0.5
+    dur_accel = xdiv(0, dist, speed_avg)
     return self.slow_fxn(0, dur_accel)
 
 
@@ -2305,18 +2266,6 @@ class Driver:
   
 
 
-   
-
-  
-
-
-
-    
-
-
-
-
-
 ### DRIVER - RETURNING FUNCTIONS
 
 def Terraindriver(terra):
@@ -2419,13 +2368,13 @@ class Stage:
 print("Iguana module running\n\n")
 
 camry = Blankcar()
-my_tilt, my_frix = 5 * DEG, 0.07
+my_tilt, my_frix = 0, 0.07
 camry.tilt, camry.frix = my_tilt, my_frix
 T_GO = 1/100
 
 camry.respeed(25)
 
-camry.pwr_drive = 10000
+#camry.pwr_drive = 10000
 toyota = camry.copy() 
 toyota.respeed(10)
 camry.sweep() 
@@ -2434,7 +2383,7 @@ kansas = Blankland()
 kansas.constant_tilt(camry.tilt)
 kansas.constant_frix(camry.frix_coeff)
 kansas.t_land = T_GO
-kansas.enter_car(camry, 0)
+kansas.enter_car(camry, kansas.endspace() - (30 * MPH * 5))
 kansas.enter_car(toyota, 105)
 kansas.name_all()
 
@@ -2447,10 +2396,11 @@ world.name_ivs()
 drv = []
 for i in range(len(world.objvec)):
   obj = world.objvec[i]
-  obj.car.respeed(25)
+  obj.car.respeed(0)
   drv.append(obj.steady_fxn())
 
-world.redrivevec(drv) #keep all cars steady
+kansas.SPEED_LIMIT = 25 
+world.redrivevec([Exp().scale(10000).scale_x(-1), Ramp(10000)])
 
 
 
@@ -2459,7 +2409,7 @@ world.redrivevec(drv) #keep all cars steady
 
 strega = ""
 strega += "INITIAL CONDITIONS:\n"
-strega += kansas.str_path()
+strega += adam.car.str_power()
 strega += "Simulating 1 second of motion\n\n"
 tau_init = 0 + time.time()   
 
@@ -2471,7 +2421,7 @@ tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
 strega += "Simulation complete\n\n"
 strega += "Processor time elapsed =  "+str(tau_diff)+"  seconds\n\n"
-strega += kansas.str_path()
+strega += adam.car.str_power()
    
 print(strega)
 
