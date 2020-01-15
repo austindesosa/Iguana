@@ -1053,6 +1053,8 @@ class Land:
     self.inspacevec=[]
     self.has_in = 0 #boolean, only true if other Land objects frow into this one
     self.has_out = 0 #boolean, only true if this Land object flows into others
+    self.STOP_SIGN = 0 #boolean, True if there is a stop sign at the end of this Land
+    self.SPEED_LIMIT = 30 * MPH
 
   def rename(self, name):
     self.name = name
@@ -1573,6 +1575,36 @@ class Land:
         v.append(x)    
     return v
 
+  def name_outs(self):
+    '''Names all this Land's outflows'''
+    for i in range(len(self.outlandvec)):
+      la = self.outlandvec[i]
+      if la != self:
+        la.rename(self.name+"_out_"+str(i))
+
+  def name_ins(self):
+    '''Names all this Land's inflows'''
+    for i in range(len(self.inlandvec)):
+      la.self.inlandvec[i]
+      if la != self:
+        la.rename(self.name+"_in_"+str(i))
+
+  def name_downstream(self):
+    v=self.connectvec_out()
+    for x in v:
+      x.name_outs()
+
+  def name_upstream(self):
+    v = self.connectvec_in()
+    for x in v:
+      x.name_ins()
+
+    
+  def name_all(self):
+    '''Names all upstream and downstream Lands'''
+    self.name_downstream()
+    self.name_upstream()
+
   def sorted_cars(self):
     '''<Returns list of Car onjects in this Land, 
     sorted from most upstream to most downstream'''
@@ -1588,6 +1620,16 @@ class Land:
           car_v.append(self.carvec[ndx])
         bookmark += len(ndx_v)
     return car_v
+
+  def str_path(self):
+    '''Returns string of all the Cars in this Land,
+    and their places in Car.path units since startpoint'''
+    nv = []
+    for i in range(len(self.carvec)):
+      nv.append(self.carvec[i].name)
+    strega = ""+str(nv)+"\n"
+    strega += str(self.carspacevec)+"\n\n"
+    return strega
 
 
 
@@ -1882,9 +1924,14 @@ class Driver:
     self.land = self.terrain.landsearch(self.car)
     self.ndx_car = self.land.carvec.index(self.car)
 
+  def landspace(self):
+    '''Returns Driver.car's place in its Land
+    in Car.path units relative to startpoint of Land'''
+    return self.land.carspacevec[self.ndx_car]
+
   def redrive(self, fxn):
     '''<Funxion object> representing engine power
-    Sets self.drive_funxion to <fxn>'''
+    Sets self.drive_funxion to <fxn> for this Driver'''
     if self.drive_funxion != fxn:
       self.drive_funxion = fxn
       self.drive_funx = self.drive_funxion.funx
@@ -2198,6 +2245,7 @@ class Driver:
     if self.car.t_now < t_mark:
       self.adjust_pwr()   
       self.land.ir(self.car, self.land.carspacevec[self.ndx_car])
+    self.sweep()   
 
 
 
@@ -2214,6 +2262,10 @@ class Driver:
         self.reverse()   
         t_rxn = k * t_col
         self.redrive(self.tospeed_fxn(fc.speed, t_rxn))
+    elif self.land.STOP_SIGN and (not self.rev):
+      space_til = self.land.endspace() - self.landspace()
+      t_til = space_til / self.speed
+      self.redrive(self.brake_fxn(self.k_react * t_til))
     self.sweep()
 
   def react_back(self, t_cush, k):
@@ -2298,15 +2350,15 @@ class Stage:
     self.carvec_stage = [self.driver_center.car]
     self.objvec = [self.driver_center]
     self.terrain = self.driver_center.terrain
-    for land in self.terrain:
+    for land in self.terrain.landvec:
       for car in land.carvec:
         if car not in self.carvec_stage:
           self.carvec_stage.append(car)
           self.objvec.append(Driver(car, self.terrain))
     self.drivevec, self.othervec = [],[]
     for obj in self.objvec:
-      self.drivevec.append(obj.drivefunxion)
-      self.othervec.append(obj.otherfunxion)
+      self.drivevec.append(obj.drive_funxion)
+      self.othervec.append(obj.other_funxion)
     self.terrain.sweep()
 
   def sweep(self):
@@ -2347,7 +2399,7 @@ class Stage:
     for obj in self.objvec:
       obj.voy_solo()   
     self.terrain.t_life += self.terrain.t_terrain
-    self.terrain.sweep()
+
 
  
 
@@ -2384,27 +2436,43 @@ kansas.constant_frix(camry.frix_coeff)
 kansas.t_land = T_GO
 kansas.enter_car(camry, 0)
 kansas.enter_car(toyota, 105)
+kansas.name_all()
 
 ter = Terrain(kansas)
 adam = Driver(camry, ter)
 
 adam.t_num = 5
+world = Stage(adam)
+world.name_ivs()
+drv = []
+for i in range(len(world.objvec)):
+  obj = world.objvec[i]
+  obj.car.respeed(25)
+  drv.append(obj.steady_fxn())
+
+world.redrivevec(drv) #keep all cars steady
+
 
 
 
 
 
 strega = ""
+strega += "INITIAL CONDITIONS:\n"
+strega += kansas.str_path()
+strega += "Simulating 1 second of motion\n\n"
 tau_init = 0 + time.time()   
 
 #SIMULATION
-adam.voyage(1)
+for i in range(100):
+  world.moment()
 #END SIMULATION
 tau_final = time.time() + 0
 tau_diff = tau_final - tau_init
-
+strega += "Simulation complete\n\n"
 strega += "Processor time elapsed =  "+str(tau_diff)+"  seconds\n\n"
-strega += camry.str_motion()   
+strega += kansas.str_path()
+   
 print(strega)
 
 
