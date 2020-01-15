@@ -476,6 +476,19 @@ def ProdFunxion(funxionvec, in_val):
   fu = Funxion(dummy, 0)
   return fu
 
+def CascadeFunxion(funxionvec, in_val):
+  '''<List of Funxions>, <Initial input>
+  Returns Function object representing nested/cascaded functions'''
+  def dummy(x):
+    y = 0 + x
+    fv=[]
+    for fui in funxionvec:
+      fv.append(fui.funx)
+    for f in fv:
+      y = f(y)
+    return y
+  return Funxion(dummy, in_val)
+
 
 def Heav(x_rise):
   '''<Rise time> on independent axis   
@@ -554,6 +567,18 @@ class Obstacle:
     Returns distance from centerpoint to border at that angle'''
     th = theta % (2 * PI)
     return self.funxion.funx(th)
+
+  def left(self):
+    '''Returns direction phasor
+    of the direction Due Left of self.orientation'''
+    qt = O_CLOCK ** -3
+    return qt * self.orientation
+
+  def right(self):
+    '''Returns direction phasor
+    of the direction Due Right of self'''
+    qt = O_CLOCK ** 3
+    return qt * self.orientation 
 
   def move(self, delta_position):
     '''<Phasor> representing change in position
@@ -1860,16 +1885,18 @@ class Driver:
   def redrive(self, fxn):
     '''<Funxion object> representing engine power
     Sets self.drive_funxion to <fxn>'''
-    self.drive_funxion = fxn
-    self.drive_funx = self.drive_funxion.funx
+    if self.drive_funxion != fxn:
+      self.drive_funxion = fxn
+      self.drive_funx = self.drive_funxion.funx
     self.pwr_out = self.drive_funx(self.car.t_now)
     self.sweep()  
 
   def reother(self, fxn):
     '''<Funxion object> represnting friction power
     Sets self.other_funxtion to <fxn>'''
-    self.other_funxion = fxn
-    self.other_funx = self.other_funxion.funx
+    if self.other_funxion != fxn:
+      self.other_funxion = fxn
+      self.other_funx = self.other_funxion.funx
     self.car.pwr_other = self.other_funx(self.energy)
     self.sweep()
 
@@ -2102,6 +2129,12 @@ class Driver:
       return SumFunxion( [self.slow_fxn(speed, dur_accel), self.steady_fxn()], self.terrain.t_life)
     else:
       return SumFunxion([self.fast_fxn(speed, dur_accel), self.steady_fxn()] , self.terrain.t_life)
+    
+  def brake_fxn(self, dur_accel):
+    '''<Time> in which you wish to brake
+    Returns Funxion object representing power output
+    to make that happen'''
+    return self.slow_fxn(0, dur_accel)
 
 
   def choose_next(self, downland):
@@ -2157,6 +2190,16 @@ class Driver:
     for i in range(self.t_num):
       self.voy()   
     self.sweep()
+
+  def voy_solo(self):
+    '''Like Driver.voy(), but only induces go method
+    in self.car, and then only if it has not gone already'''
+    t_mark = self.terrain.t_life + (self.land.t_land / 10000)
+    if self.car.t_now < t_mark:
+      self.adjust_pwr()   
+      self.land.ir(self.car, self.land.carspacevec[self.ndx_car])
+
+
 
   def react_front(self, t_cush, k):
     '''<Maximum anticipated collision time> worth reacting to, <Number between 0 and 1>
@@ -2245,6 +2288,74 @@ def Cardriver(car):
   terra.sweep()   
   return Driver(car, terra)
 
+### STAGE CLASS
+
+class Stage:
+
+  def __init__(self, driver):
+    self.name = "stage"
+    self.driver_center = driver
+    self.carvec_stage = [self.driver_center.car]
+    self.objvec = [self.driver_center]
+    self.terrain = self.driver_center.terrain
+    for land in self.terrain:
+      for car in land.carvec:
+        if car not in self.carvec_stage:
+          self.carvec_stage.append(car)
+          self.objvec.append(Driver(car, self.terrain))
+    self.drivevec, self.othervec = [],[]
+    for obj in self.objvec:
+      self.drivevec.append(obj.drivefunxion)
+      self.othervec.append(obj.otherfunxion)
+    self.terrain.sweep()
+
+  def sweep(self):
+    for i in range(len(self.objvec)):
+      obj = self.objvec[i]
+      self.drivevec[i]=obj.drive_funxion
+      self.othervec[i]=obj.other_funxion
+    self.terrain.sweep()
+
+  def redrivevec(self, fxn_vec):
+    for i in range(len(fxn_vec)):
+      if i < len(self.objvec):
+        self.objvec[i].redrive(fxn_vec[i])
+    self.sweep()
+
+  def reothervec(self, fxn_vec):
+    for i in range(len(fxn_vec)):
+      if i < len(self.objvec):
+        self.objvec[i].reother(fxn_vec[i])
+    self.sweep()
+
+  def rename(self, new_name):
+    self.name = new_name
+
+  def name_ivs(self):
+    '''Renames all the Drivers and Cars in this Stage'''
+    for i in range(len(self.objvec)):
+      dr = self.objvec[i]
+      if dr == self.driver_center:
+        dr.name = "driver_center"
+      else:
+        dr.name = "driver_"+str(i)     
+      dr.car.rename(dr.name+"_car")
+    self.name = self.name
+
+  def moment(self):
+    '''Like Land.ir_todos, but fir a Stage object'''
+    for obj in self.objvec:
+      obj.voy_solo()   
+    self.terrain.t_life += self.terrain.t_terrain
+    self.terrain.sweep()
+
+ 
+
+  
+
+
+
+    
 
   
 
