@@ -892,7 +892,8 @@ class Car:
     strega += "self.pwr_other = "+str(self.pwr_other)+"  watts\n"
     strega += "self.pwr_grav = "+str(self.pwr_grav) +"  watts\n"
     strega += "self.tilt = "+str(self.tilt)+"  radians downward\n"
-    strega += "self.energy = "+str(self.energy)+" watt-seconds\n\n\n"
+    strega += "self.energy = "+str(self.energy)+" watt-seconds\n"
+    strega += "self.t_now = "+str(self.t_now)+"  seconds\n\n\n"
     return strega 
 
   def str_time(self):
@@ -1155,6 +1156,44 @@ class Land:
       car.pos = z + self.land_position
       car.sweep()
     self.sweep()
+
+  def land_until(self, pt):
+    '''<Point> in this Land in Car.path units
+    Returns Land object representing path 
+    from startpoint to <pt> meters in'''
+    tv,hv,fv = [],[],[]
+    n = 1 + self.ndx_point(pt)
+    for i in range(n):
+      tv.append(self.tiltvec[i])
+      hv.append(self.helmvec[i])
+      fv.append(self.frixvec[i])
+    la = Land(tv, hv, self.delta_space)
+    la.frixvec = fv
+    for i in range(len(self.carspacevec)):
+      p = self.carspacevec[i]
+      if p < pt:
+        c = self.carvec[i]
+        la.enter_car(c, p)
+    la.sweep()
+    return la
+
+  def land_since(self, pt):
+    tv, hv, fv = [],[],[]
+    n = 1 + self.ndx_point(pt)
+    for i in range(n, len(self.tiltvec)):
+      tv.append(self.tiltvec[i])
+      hv.append(self.helmvec[i])
+      fv.append(self.frixvec[i])
+    la = Land(tv,hv, self.delta_space)
+    la.frixvec = fv
+    sh = self.delta_space - (pt % self.delta_space)
+    for i in range(len(self.carspacevec)):
+      p = self.carspacevec[i]
+      if p >= pt:
+        c = self.carvec[i]
+        la.enter_car(c, p - sh)
+    la.sweep()
+    return la
 
     
   def extend(self, tilt_v, helm_v ):
@@ -1536,7 +1575,7 @@ class Land:
   def name_ins(self):
     '''Names all this Land's inflows'''
     for i in range(len(self.inlandvec)):
-      la.self.inlandvec[i]
+      la = self.inlandvec[i]
       if la != self:
         la.rename(self.name+"_in_"+str(i))
 
@@ -2396,58 +2435,17 @@ T_GO = 1/100
 
 camry.respeed(25)
 
-#camry.pwr_drive = 10000
-toyota = camry.copy() 
-toyota.respeed(10)
-camry.sweep() 
-toyota.sweep()
-kansas = Blankland()
-kansas.constant_tilt(camry.tilt)
-kansas.constant_frix(camry.frix_coeff)
-kansas.t_land = T_GO
-kansas.enter_car(camry, kansas.endspace() - (30 * MPH * 5))
-kansas.enter_car(toyota, 105)
-kansas.name_all()
-
-ter = Terrain(kansas)
-adam = Driver(camry, ter)
-
-rv = [Konstant(0), Konstant(100000), Konstant(200000)]
-adam.reservevec = rv
-adam.sel_robin(0.7)
-
-adam.t_num = 5
-world = Stage(adam)
-world.name_ivs()
-drv = []
-for i in range(len(world.objvec)):
-  obj = world.objvec[i]
-  obj.car.respeed(0)
-  drv.append(obj.steady_fxn())
-
-kansas.SPEED_LIMIT = 25 
-#world.redrivevec([Exp().scale(10000).scale_x(-1), Ramp(10000)])
-
-
-
-
-
+kansas = Blankland()  
+namv = []
+for i in range(5):
+  namv.append("car_"+str(i))
+nc = named_cars(namv)
+for i in range(len(nc)):
+  kansas.enter_car(nc[i], i*100)
+kans_up = kansas.land_until(250)
+kans_down = kansas.land_since(250)
 
 strega = ""
-strega += "INITIAL CONDITIONS:\n"
-strega += adam.car.str_power()
-strega += "Simulating 1 second of motion\n\n"
-tau_init = 0 + time.time()   
-
-#SIMULATION
-adam.voyage(1)
-#END SIMULATION
-tau_final = time.time() + 0
-tau_diff = tau_final - tau_init
-strega += "Simulation complete\n\n"
-strega += "Processor time elapsed =  "+str(tau_diff)+"  seconds\n\n"
-strega += adam.car.str_power()
-   
+strega +="kans_up:\n"+kans_up.str_path()
+strega +="kans_down:\n"+kans_down.str_path()
 print(strega)
-
-
