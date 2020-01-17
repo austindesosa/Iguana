@@ -1846,13 +1846,30 @@ class Terrain:
     Creates a crossroads where <upland> T-bones into <splitland>,
     at a point <point> meters into <splitland>.
     WARNING: Works best if <upland> is in this Terrain, but <splitland> is Not in this Terrain'''
+    print("Terrain.crossroads invoked\n")
     part_upstream = splitland.land_until(point)
+    part_upstream.rename("part_upstream")
     part_downstream = splitland.land_since(point)
+    part_downstream.rename("part_upstream")
+    print("part_downstream.compass = "+str(part_downstream.compass)+"\n")
+    print("upland.outlandvec = "+str(upland.outlandvec)+"\n")
     part_upstream.outflow(part_downstream)
+    print("part_downstream is now an outflow of part_upstream\n")
+    print("upland.outlandvec = "+str(upland.outlandvec)+"\n")
     upland.inflow(part_downstream, upland.endspace() )
+    print("part_downstream.compass = "+str(part_downstream.compass)+"\n")
     upland.outflow(part_downstream)
+    print("part_downstream is now an outflow of upland\n")
+    print("part_downstream.compass = "+str(part_downstream.compass)+"\n")
     upland.repos_all()
+    print("upland.repos_all invoked\n")
+    print("part_downstream.compass = "+str(part_downstream.compass)+"\n")
+    print("upland.outlandvec = "+str(upland.outlandvec)+"\n")
     self.sweep()
+    print("Terrain.sweep invoked\n")
+    print("part_downstream.compass = "+str(part_downstream.compass)+"\n")
+    print("upland.outlandvec = "+str(upland.outlandvec)+"\n")
+    print("Terrain.crossroads complete\n\n\n")
 
   def str_lands(self):
     namv, posv, compv = [],[],[]
@@ -1888,7 +1905,7 @@ def Carterrain( car ):
 
 def Fleurterrain(fork_helm):
   '''<helm> for the curved branches 
-  Returrns Terrain object in the shape of a fleur-de-lis
+  Returns Terrain object in the shape of a fleur-de-lis
   '''
   out_v, in_v = [],[]
   for i in range(3):
@@ -2163,13 +2180,13 @@ class Driver:
   def soon_car(self):
     '''Returns Car object with Shortest time
     until it hits this Driver's Car'''
-    if self.t_collision(self.back_car) < self.t_collision :
+    if self.t_collision(self.back_car()) < self.t_collision(self.front_car()) :
       return self.back_car()     
     else:
       return self.front_car()   
 
   def alone(self):
-    return self.front_car == self.car
+    return self.soon_car() == self.car
 
   def revmatch(self, other_car):
     return self.car.rev == other_car.rev   
@@ -2196,7 +2213,7 @@ class Driver:
           v.append(x)
       ret += max(v)
     else:
-      v.append(self.land.enspace() )
+      v.append(self.land.endspace() )
       for x in self.land.inspacevec:
         if x >= pt_car:
           v.append(x)
@@ -2505,14 +2522,23 @@ class Stage:
 
 print("Iguana module running\n\n")
 
-kansas, nebraska = Blankland(), Blankland()  
-kansas.rename("kansas")
-ter = Terrain(kansas) 
-nebraska.recompass(O_CLOCK ** 2)    
-ter.crossroads(kansas, nebraska, 300)
-kansas.outlandvec[0].rename("kans_out")
-kansas.inlandvec[0].rename("kans_in")
-print(ter.str_lands())  
+kansas = Blankland()   
+nc = named_cars(["car_back", "car_mid", "car_front"])
+kansas.enter_car(nc[0],450)
+nc[0].respeed(50)
+kansas.enter_car(nc[1], 500)
+nc[1].respeed(50)
+kansas.enter_car(nc[2], 540)
+nc[2].respeed()
+nc[2].reverse()
 
-
-
+ter = Terrain(kansas)
+nebraska, oklahoma = Blankland(), Blankland()
+nebraska.recompass(eul(30*DEG))
+oklahoma.recompass(eul(60*DEG))
+ter.inpll(kansas, [nebraska, oklahoma], 600)
+texas, florida = Blankland(), Blankland() 
+texas.recompass(eul(30*DEG))
+florida.recompass(eul(60*DEG))
+ter.inpll(kansas, [texas, florida],200)
+adam = Driver(nc[1], ter)
