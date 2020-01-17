@@ -2220,6 +2220,23 @@ class Driver:
       ret += min(v)
     return ret
 
+  def toward(self, other_car):
+    ret = 0
+    if not self.revmatch(other_car):
+      a = (not self.car.rev) and self.is_behind(other_car)
+      b = self.car.rev and self.is_infront(other_car)
+      ret = ret or a or b
+    else:
+      if self.car.rev:
+        a = self.is_behind(other_car) and (self.car.speed < other_car.speed)
+        b = self.is_infront(other_car) and (other_car.speed < self.car.speed)
+        ret = ret or a or b
+      else:
+        a = self.is_behind(other_car) and (other_car.speed < self.car.speed)
+        b = self.is_infront(other_car) and (self.car.speed < other_car.speed)
+        ret = ret or a or b
+    return ret
+
   
 
 
@@ -2521,24 +2538,16 @@ class Stage:
 ### TESTING SECTION
 
 print("Iguana module running\n\n")
-
-kansas = Blankland()   
 nc = named_cars(["car_back", "car_mid", "car_front"])
-kansas.enter_car(nc[0],450)
-nc[0].respeed(50)
-kansas.enter_car(nc[1], 500)
-nc[1].respeed(50)
-kansas.enter_car(nc[2], 540)
-nc[2].respeed()
-nc[2].reverse()
-
+kansas = Blankland()
 ter = Terrain(kansas)
-nebraska, oklahoma = Blankland(), Blankland()
-nebraska.recompass(eul(30*DEG))
-oklahoma.recompass(eul(60*DEG))
-ter.inpll(kansas, [nebraska, oklahoma], 600)
-texas, florida = Blankland(), Blankland() 
-texas.recompass(eul(30*DEG))
-florida.recompass(eul(60*DEG))
-ter.inpll(kansas, [texas, florida],200)
+for i in range(3):
+  carro = nc[i]
+  carro.respeed(25)
+  kansas.enter_car(carro, i * 100)
+  ter.sweep()
 adam = Driver(nc[1], ter)
+
+
+
+
