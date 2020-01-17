@@ -1187,6 +1187,7 @@ class Land:
     la = Land(tv,hv, self.delta_space)
     la.frixvec = fv
     sh = self.delta_space - (pt % self.delta_space)
+    la.recompass( self.drxn_ray(n * self.delta_space) )
     for i in range(len(self.carspacevec)):
       p = self.carspacevec[i]
       if p >= pt:
@@ -1838,7 +1839,35 @@ class Terrain:
   def inpll(self, land_contact, land_array, inpoint):
     for la in land_array:
       land_contact.inflow(la, inpoint)
-    self.sweep()    
+    self.sweep()
+
+  def crossroads(self, upland, splitland, point):
+    '''<Upstream Land object>, <Land object to be Split>, <Point> at which land will be split
+    Creates a crossroads where <upland> T-bones into <splitland>,
+    at a point <point> meters into <splitland>.
+    WARNING: Works best if <upland> is in this Terrain, but <splitland> is Not in this Terrain'''
+    part_upstream = splitland.land_until(point)
+    part_downstream = splitland.land_since(point)
+    part_upstream.outflow(part_downstream)
+    upland.inflow(part_downstream, upland.endspace() )
+    upland.outflow(part_downstream)
+    upland.repos_all()
+    self.sweep()
+
+  def str_lands(self):
+    namv, posv, compv = [],[],[]
+    for i in range(len(self.landvec)):
+      la = self.landvec[i]
+      namv.append(la.name)
+      posv.append(la.land_position)
+      compv.append(la.compass)
+    strega = self.name+"   has these Lands:\n"
+    strega += "Names:    \t"+str(namv)+"\n"
+    strega += "Positions:\t"+str(posv)+"\n"
+    strega += "Compasses:\t"+str(compv)+"\n\n"
+    return strega
+
+
 
 ### TERRAIN - RETURNING FUNCTIONS
 def Blankterrain():
@@ -2129,6 +2158,54 @@ class Driver:
     #for cars on nearby inflows and outflows
     else:
       return self.car #default answer for when no cars behind you
+
+    
+  def soon_car(self):
+    '''Returns Car object with Shortest time
+    until it hits this Driver's Car'''
+    if self.t_collision(self.back_car) < self.t_collision :
+      return self.back_car()     
+    else:
+      return self.front_car()   
+
+  def alone(self):
+    return self.front_car == self.car
+
+  def revmatch(self, other_car):
+    return self.car.rev == other_car.rev   
+
+  def speedmatch(self, other_car):
+    n = self.drive_funxion.BAR_NUM
+    k_min = float(n-1) / n
+    k_max = float(n +1) / n
+    speed_min, speed_max = k_min * self.car.speed, k_max * self.car.speed
+    ret = speed_min < other_car.speed < speed_max
+    ret = ret and self.revmatch(other_car)
+    return ret
+
+  def next_juncture(self):
+    '''Returns float representing place of next upcoming inflow or outflow
+    in Car.path units relative to startpoint of this Driver's Land'''
+    ret = 0
+    pt_car = self.land.carspacevec[self.ndx_car]
+    v = []
+    if self.car.rev:
+      v.append(0)
+      for x in self.land.inspacevec:
+        if x < pt_car:
+          v.append(x)
+      ret += max(v)
+    else:
+      v.append(self.land.enspace() )
+      for x in self.land.inspacevec:
+        if x >= pt_car:
+          v.append(x)
+      ret += min(v)
+    return ret
+
+  
+
+
 
   def reverse(self):
     '''Encapsulation of Car.reverse for this Driver object'''
@@ -2428,24 +2505,14 @@ class Stage:
 
 print("Iguana module running\n\n")
 
-camry = Blankcar()
-my_tilt, my_frix = 0, 0.07
-camry.tilt, camry.frix = my_tilt, my_frix
-T_GO = 1/100
+kansas, nebraska = Blankland(), Blankland()  
+kansas.rename("kansas")
+ter = Terrain(kansas) 
+nebraska.recompass(O_CLOCK ** 2)    
+ter.crossroads(kansas, nebraska, 300)
+kansas.outlandvec[0].rename("kans_out")
+kansas.inlandvec[0].rename("kans_in")
+print(ter.str_lands())  
 
-camry.respeed(25)
 
-kansas = Blankland()  
-namv = []
-for i in range(5):
-  namv.append("car_"+str(i))
-nc = named_cars(namv)
-for i in range(len(nc)):
-  kansas.enter_car(nc[i], i*100)
-kans_up = kansas.land_until(250)
-kans_down = kansas.land_since(250)
 
-strega = ""
-strega +="kans_up:\n"+kans_up.str_path()
-strega +="kans_down:\n"+kans_down.str_path()
-print(strega)
